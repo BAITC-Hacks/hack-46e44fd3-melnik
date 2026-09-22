@@ -1,2 +1,8 @@
-# hack-46e44fd3-melnik
-Hackathon team repository for Melnik
+# HackAlem AI — Логистика
+
+Быстрый старт:
+
+    cp .env.example .env
+    docker compose up --build
+
+Эндпоинты: `/health`, `/ask`, `/items`.
