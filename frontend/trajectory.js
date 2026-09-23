@@ -192,6 +192,26 @@
     const delta = select('#result-delta');
     const caption = select('#score-caption');
     const result = appState().result;
+    const delayNote = select('.trajectory-delay-note');
+    if (delayNote) {
+      const beforeById = new Map((result?.districts || []).map((district) => [district.id, district.indicators_before]));
+      const unchanged = beforeById.size > 0 && point.districts?.length === beforeById.size
+        && point.districts.every((district) => {
+          const before = beforeById.get(district.id);
+          return before && Object.entries(before).every(([indicator, value]) =>
+            Number(district.indicators[indicator]) === Number(value));
+        });
+      const horizons = { 1: '3 месяца', 2: 'полгода', 4: 'год', 8: '2 года' };
+      if (unchanged && point.quarter === 1) {
+        delayNote.textContent = 'Через 3 месяца эффекты ещё не наступили: у всех мер задержка от квартала. Переключите на «полгода» или дальше';
+      } else if (unchanged) {
+        const horizon = horizons[point.quarter] || `${point.quarter} квартала`;
+        delayNote.textContent = `Через ${horizon} показатели совпадают с исходными.${point.quarter < 8 ? ' Переключите на более поздний срок.' : ''}`;
+      } else {
+        delayNote.textContent = 'Эффект мер наступает с задержкой: школы и ЖКХ дают результат позже, освещение и сервисы — быстрее.';
+      }
+      delayNote.setAttribute('aria-live', 'polite');
+    }
     if (score) score.textContent = format(point.score);
     if (delta && result) {
       const difference = point.score - result.score_base;

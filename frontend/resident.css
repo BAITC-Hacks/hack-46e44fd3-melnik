@@ -22,6 +22,7 @@
 .resident-chips button { padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--sky) 32%, var(--line)); border-radius: 99px; color: var(--navy); background: var(--card); cursor: pointer; font-size: 12px; }
 .resident-chips button:hover { border-color: var(--sky); background: var(--sky-2); }
 .resident-district-hint { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--gold); border-radius: 12px; color: var(--navy); background: color-mix(in srgb, var(--gold) 14%, var(--card)); font-size: 13px; }
+.resident-result-district-hint { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; color: var(--navy); background: color-mix(in srgb, var(--gold) 14%, var(--card)); font-size: 13px; }
 .resident-hint-action { padding: 5px 9px; border: 1px solid var(--navy); border-radius: 8px; color: var(--navy); background: var(--card); cursor: pointer; font: inherit; font-weight: 700; }
 .resident-hint-action:hover, .resident-hint-action:focus-visible { background: var(--sky-2); }
 .resident-disclaimer { margin: 16px 0 0; color: var(--muted); font-size: 12px; }

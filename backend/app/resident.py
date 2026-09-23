@@ -117,14 +117,20 @@ def _nearest_measures(message: str, limit: int = 3) -> list[str]:
     return [measure["name"] for measure in ranked[:limit]]
 
 
+def _mentioned_district(message: str) -> str | None:
+    words = set(_normalise_text(message).split())
+    matches = [
+        district["id"]
+        for district in DISTRICTS
+        if words.intersection(_DISTRICT_FORMS[district["id"]])
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
 def _infer_district(district_id: str | None, message: str) -> str | None:
     if district_id is not None:
         return district_id if district_id in DISTRICT_BY_ID else None
-    words = set(_normalise_text(message).split())
-    for district in DISTRICTS:
-        if words.intersection(_DISTRICT_FORMS[district["id"]]):
-            return district["id"]
-    return None
+    return _mentioned_district(message)
 
 
 def _llm_match(message: str) -> tuple[str | None, str]:
@@ -273,6 +279,18 @@ def propose_resident(district_id: str | None, message: str) -> dict[str, Any]:
 
     measure = MEASURE_BY_ID[measure_id]
     inferred_district = _infer_district(district_id, message or "")
+    mentioned_district = _mentioned_district(message or "")
+    district_hint = (
+        {
+            "id": mentioned_district,
+            "name": DISTRICT_BY_ID[mentioned_district]["name"],
+        }
+        if measure["type"] == "district"
+        and district_id in DISTRICT_BY_ID
+        and mentioned_district is not None
+        and mentioned_district != district_id
+        else None
+    )
     if measure["type"] == "district" and inferred_district is None:
         return _needs_district(measure, source)
     placement_district = inferred_district if measure["type"] == "district" else None
@@ -346,6 +364,7 @@ def propose_resident(district_id: str | None, message: str) -> dict[str, Any]:
         "matched": True,
         "measure": _measure_payload(measure),
         "district": district_payload,
+        "district_hint": district_hint,
         "evidence": evidence,
         "plan": {
             "selections": verified.selections,

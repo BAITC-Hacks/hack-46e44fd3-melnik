@@ -47,7 +47,8 @@
   function localDistrictName(id) {
     if (!id) return 'Весь город';
     const districts = catalog?.districts || [];
-    return districts.find((district) => district.id === id)?.name || String(id);
+    const fallback = { esil: 'Есиль', almaty: 'Алматы', saryarka: 'Сарыарка', baikonur: 'Байконур', nura: 'Нура' };
+    return districts.find((district) => district.id === id)?.name || fallback[id] || String(id);
   }
 
   function localMeasure(proposal) {
@@ -186,6 +187,7 @@
     vote.disabled = didVote || busy;
     vote.addEventListener('click', () => castVote(proposal.id, vote));
     card.append(actions);
+    if (votes === 0) append(card, 'p', 'vote-zero-note', 'Нужен хотя бы один голос для народного сценария.');
     return card;
   }
 
@@ -202,12 +204,11 @@
 
   function renderComparison(parent, label, result) {
     const score = format(scoreFor(result));
-    if (score === null) return;
     const cost = format(result?.cost ?? result?.cost_total, 0);
     const box = append(parent, 'div', 'people-comparison-card');
     append(box, 'span', '', label);
-    append(box, 'strong', '', score);
-    if (cost !== null) append(box, 'small', '', `Стоимость: ${cost}`);
+    append(box, 'strong', '', score ?? '—');
+    append(box, 'small', '', score === null ? 'Нет рассчитанного сценария' : `Стоимость: ${cost ?? '—'}`);
   }
 
   function scenarioDistricts(scenario) {
@@ -236,19 +237,6 @@
     append(card, 'p', 'eyebrow', 'Народный сценарий');
     append(card, 'h3', '', data?.message || 'План из предложений жителей');
 
-    const metricRow = append(card, 'div', 'people-scenario-metrics');
-    const scenarioScore = format(scoreFor(scenario));
-    const scenarioCost = format(scenario.cost ?? scenario.cost_total, 0);
-    if (scenarioScore !== null) {
-      const metric = append(metricRow, 'div', 'people-scenario-metric');
-      append(metric, 'span', '', 'Score сценария');
-      append(metric, 'strong', '', scenarioScore);
-    }
-    if (scenarioCost !== null) {
-      const metric = append(metricRow, 'div', 'people-scenario-metric');
-      append(metric, 'span', '', 'Стоимость');
-      append(metric, 'strong', '', scenarioCost);
-    }
     const districtLines = scenarioDistricts(scenario);
     if (districtLines.length) {
       const districtBlock = append(card, 'div', 'people-scenario-districts');
@@ -263,7 +251,6 @@
     const max = data?.blind_max ?? data?.maximum ?? (data?.max_score != null ? { score: data.max_score } : null);
     renderComparison(comparisons, 'Максимум формулы', max);
     renderComparison(comparisons, 'Текущий сценарий', data?.current_scenario);
-    if (!comparisons.children.length) comparisons.remove();
 
     if (included.length) {
       append(card, 'h4', '', 'Вошли в план');
@@ -284,11 +271,18 @@
       const list = document.createElement('ul');
       excluded.forEach((entry) => {
         const proposal = entry.proposal || proposals.find((item) => String(item.id) === String(entry.proposal_id)) || entry;
-        const name = entry.measure_title || proposal.measure_title || proposal.measure_id || entry.measure_id || entry.proposal_id || 'Предложение';
+        const measureId = entry.measure_id || proposal.measure_id;
+        const name = entry.measure_title || proposal.measure_title || localMeasure({ measure_id: measureId })?.name || proposal.text || 'Предложение';
+        const districtId = entry.district_id ?? proposal.district_id;
+        const district = entry.district_name || proposal.district_name || localDistrictName(districtId);
         const reason = entry.reason || proposal.reason || 'Не удалось включить в допустимый план';
-        append(list, 'li', 'people-excluded-item', `${name}: ${reason}`);
+        append(list, 'li', 'people-excluded-item', `${name} · ${district}: ${reason}`);
       });
       card.append(list);
+    }
+    const notParticipatedCount = Number(data?.not_participated_count);
+    if (data?.not_participated_count != null && Number.isInteger(notParticipatedCount) && notParticipatedCount >= 0) {
+      append(card, 'p', 'people-not-participated', `Не участвовали: нет ни одного голоса (${notParticipatedCount})`);
     }
 
     const selections = scenario.selections || data?.selections;
@@ -369,6 +363,7 @@
         body: JSON.stringify({ current_scenario: currentSelections() }),
       });
       renderPeopleScenario(data);
+      await refresh();
       setStatus('Народный сценарий пересчитан симулятором.');
     } catch (error) {
       setStatus(error.message || 'Не удалось собрать народный сценарий', 'error');

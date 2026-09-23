@@ -79,6 +79,7 @@ def test_district_in_text_produces_verified_plan(
     assert result["matched"] is True
     assert result["measure"]["id"] == measure_id
     assert result["district"]["id"] == district_id
+    assert result["district_hint"] is None
     assert {"measure_id": measure_id, "district_id": district_id} in result["plan"]["selections"]
     assert result["plan"]["score"] == pytest.approx(
         simulate(result["plan"]["selections"]).score
@@ -92,6 +93,7 @@ def test_explicit_district_overrides_text(monkeypatch) -> None:
 
     assert result["matched"] is True
     assert result["district"]["id"] == "esil"
+    assert result["district_hint"] == {"id": "nura", "name": "Нура"}
 
 
 @pytest.mark.parametrize("district_id", [None, "nura", "esil", "saryarka", "baikonur", "almaty"])

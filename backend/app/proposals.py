@@ -13,7 +13,7 @@ import tempfile
 import threading
 import uuid
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -70,7 +70,7 @@ def _write_unlocked(proposals: list[dict[str, Any]]) -> None:
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _resolve_evidence(
@@ -264,10 +264,12 @@ def _placement_conflict_reason(
     placements = {row["measure_id"]: row.get("district_id") for row in proposed}
     for first, second in INCOMPATIBILITIES:
         if first in placements and second in placements:
+            other_id = second if measure_id == first else first
+            other_name = MEASURE_BY_ID[other_id]["name"]
             if first == "M1" and second == "M3":
-                return "Меры M1 и M3 несовместимы"
+                return f"Несовместимо с «{other_name}»"
             if placements[first] == placements[second]:
-                return f"Меры {first} и {second} несовместимы в этом районе"
+                return f"Несовместимо с «{other_name}» в этом районе"
     return "Не удалось дополнить предложения до допустимого набора из пяти мер"
 
 
@@ -277,7 +279,10 @@ def build_people_scenario(
     """Greedily accept vote-ranked placements while the optimizer can complete them."""
     with _LOCK:
         rows = _read_unlocked()
-    ranked = sorted(rows, key=_proposal_order)
+    ranked = sorted(
+        (row for row in rows if int(row.get("votes", 0)) >= 1),
+        key=_proposal_order,
+    )
     accepted: list[dict[str, Any]] = []
     excluded: list[dict[str, str]] = []
     for row in ranked:
@@ -367,7 +372,8 @@ def build_people_scenario(
         "scenario": scenario,
         "included": accepted,
         "excluded": excluded,
+        "not_participated_count": sum(int(row.get("votes", 0)) == 0 for row in rows),
         "blind_max": _blind_maximum() if scenario else None,
         "current_scenario": current_payload,
-        "reason": None if scenario else "Пока нет подходящих предложений для сценария",
+        "reason": None if scenario else "Пока нет предложений с голосами для сценария",
     }

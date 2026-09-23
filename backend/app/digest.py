@@ -6,7 +6,7 @@ import json
 import os
 import re
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from openai import OpenAI
@@ -36,7 +36,7 @@ _SYSTEM_PROMPT = (
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _request_llm(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

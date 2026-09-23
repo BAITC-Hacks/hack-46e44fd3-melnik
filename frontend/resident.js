@@ -197,6 +197,30 @@
     }
   }
 
+  function renderResultDistrictHint(data) {
+    const district = data?.district_hint;
+    if (!district?.id || !catalog?.districts?.some((item) => item.id === district.id)) return;
+    const output = $('#resident-output');
+    const name = district.name || districtName(district.id);
+    const prompt = document.createElement('div');
+    prompt.className = 'resident-result-district-hint';
+    appendText(prompt, 'span', '', `В тексте упомянут район ${name} — рассчитать для него?`);
+    const retry = appendText(prompt, 'button', 'resident-hint-action', 'Рассчитать для этого района');
+    retry.type = 'button';
+    retry.addEventListener('click', () => {
+      const select = $('#resident-district');
+      const form = $('#resident-form');
+      select.value = district.id;
+      clearDistrictPrompt();
+      updateDistrictHint();
+      retry.disabled = true;
+      retry.textContent = 'Пересчитываем…';
+      form.requestSubmit();
+    });
+    output.append(prompt);
+    $('#resident-district-hint')?.classList.add('hidden');
+  }
+
   function renderEvidence(data, card) {
     const evidence = data.evidence || {};
     const effects = getEffects(data);
@@ -393,6 +417,7 @@
     if (data?.needs_district) renderNeedsDistrict(data);
     else if (!data?.matched) renderUnmatched(data || {});
     else renderMatched(data);
+    renderResultDistrictHint(data);
   }
 
   function showStatus(message = '', type = '') {

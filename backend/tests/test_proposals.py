@@ -79,6 +79,32 @@ def test_votes_are_deduplicated_per_proposal(board_path):
     assert third["votes"] == 2
 
 
+def test_people_scenario_requires_votes_and_preserves_zero_vote_status(board_path):
+    voted = proposals.create_proposal(
+        {"measure_id": "M8", "district_id": "nura", "text": "Поликлиника в Нуре"}
+    )
+    unvoted = proposals.create_proposal(
+        {"measure_id": "M4", "district_id": "saryarka", "text": "Парк в Сарыарке"}
+    )
+
+    without_votes = proposals.build_people_scenario()
+    assert without_votes["scenario"] is None
+    assert without_votes["included"] == []
+    assert without_votes["excluded"] == []
+    assert without_votes["not_participated_count"] == 2
+    assert {row["status"] for row in proposals.list_proposals()["proposals"]} == {"checked"}
+
+    proposals.vote_proposal(voted["id"], "resident-token")
+    with_vote = proposals.build_people_scenario()
+    assert with_vote["scenario"] is not None
+    assert [row["proposal_id"] for row in with_vote["included"]] == [voted["id"]]
+    assert with_vote["excluded"] == []
+    assert with_vote["not_participated_count"] == 1
+    statuses = {row["id"]: row["status"] for row in proposals.list_proposals()["proposals"]}
+    assert statuses[voted["id"]] == "in_people_scenario"
+    assert statuses[unvoted["id"]] == "checked"
+
+
 def test_build_people_scenario_rejects_unconditional_m1_m3_conflict(board_path):
     m1 = proposals.create_proposal(
         {
@@ -103,7 +129,8 @@ def test_build_people_scenario_rejects_unconditional_m1_m3_conflict(board_path):
         for item in result["excluded"]
         if item["proposal_id"] == m1["id"]
     )
-    assert "несовместимы" in reason
+    assert "Линия ЛРТ / расширение" in reason
+    assert "M3" not in reason
     statuses = {
         item["id"]: item["status"]
         for item in proposals.list_proposals()["proposals"]
