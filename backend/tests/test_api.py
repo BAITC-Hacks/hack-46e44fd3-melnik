@@ -41,6 +41,13 @@ def test_trajectory_api_matches_simulation_at_quarter_eight():
     assert round(response.json()[-1]["score"], 5) == 56.54307
 
 
+def test_indicator_visualization_assets_are_served():
+    for path in ("/matrix.js", "/radar.js", "/insights.css"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert response.content
+
+
 def test_explain_recomputes_and_uses_fallback(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     simulation = client.post("/api/simulate", json={"selections": EXAMPLE}).json()

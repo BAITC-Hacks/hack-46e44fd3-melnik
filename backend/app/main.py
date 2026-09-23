@@ -87,6 +87,21 @@ def trajectory_javascript() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "trajectory.js", media_type="text/javascript")
 
 
+@app.get("/insights.css", include_in_schema=False)
+def insights_stylesheet() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "insights.css", media_type="text/css")
+
+
+@app.get("/matrix.js", include_in_schema=False)
+def matrix_javascript() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "matrix.js", media_type="text/javascript")
+
+
+@app.get("/radar.js", include_in_schema=False)
+def radar_javascript() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "radar.js", media_type="text/javascript")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}

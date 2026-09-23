@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./advisor.css">
   <link rel="stylesheet" href="./trajectory.css">
+  <link rel="stylesheet" href="./insights.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
@@ -77,6 +78,37 @@
         <div id="district-results" class="district-grid"></div>
       </section>
 
+      <section class="result-section indicator-views">
+        <div class="section-heading">
+          <div><p class="eyebrow">Профиль города</p><h2>Матрица показателей</h2></div>
+          <p>Пять районов × десять показателей на единой шкале. Наведите на ячейку для точного значения.</p>
+        </div>
+        <div class="matrix-toolbar">
+          <div class="matrix-toggle" role="group" aria-label="Режим матрицы">
+            <button type="button" data-matrix-mode="before" aria-pressed="false">До</button>
+            <button type="button" data-matrix-mode="after" class="active" aria-pressed="true">После</button>
+            <button type="button" data-matrix-mode="delta" aria-pressed="false">Δ</button>
+          </div>
+          <p id="matrix-legend" class="matrix-legend">Единая шкала: красный &lt; 40, жёлтый 40–69, зелёный ≥ 70.</p>
+        </div>
+        <div class="matrix-scroll"><div id="indicator-matrix"></div></div>
+      </section>
+
+      <section class="result-section indicator-views">
+        <div class="section-heading">
+          <div><p class="eyebrow">Диагностика района</p><h2>До и после по 10 осям</h2></div>
+          <div class="radar-controls">
+            <label for="district-radar-select">Район</label>
+            <select id="district-radar-select"></select>
+          </div>
+        </div>
+        <div class="chart-card radar-card">
+          <canvas id="district-radar"></canvas>
+          <p id="radar-fallback" class="radar-fallback hidden">Radar недоступен без Chart.js.</p>
+        </div>
+        <p id="radar-insight" class="radar-insight"></p>
+      </section>
+
       <section class="result-section analysis-section">
         <div class="section-heading">
           <div><p class="eyebrow">Проверяемая интерпретация</p><h2>AI-анализ сценария</h2></div>
@@ -96,5 +128,7 @@
   <footer>QalaQadam · HackAlem AI 2026 · Числа считает код, LLM только объясняет результат</footer>
   <script src="./advisor.js" defer></script>
   <script src="./trajectory.js" defer></script>
+  <script src="./matrix.js" defer></script>
+  <script src="./radar.js" defer></script>
 </body>
 </html>
