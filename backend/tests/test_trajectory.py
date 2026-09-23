@@ -28,6 +28,23 @@ def test_reference_scenario_finishes_at_simulation_result():
     assert points[-1]["score"] == pytest.approx(result.score)
     assert points[-1]["score"] == pytest.approx(56.54307)
     assert points[-1]["D_avg"] == pytest.approx(result.city_avg_after)
+    assert len(points[-1]["districts"]) == 5
+    for district in points[-1]["districts"]:
+        simulated = next(item for item in result.districts if item["id"] == district["id"])
+        assert district["D_d"] == pytest.approx(simulated["D_after"])
+        assert district["indicators"] == pytest.approx(simulated["indicators_after"])
+
+
+def test_each_quarter_contains_full_district_indicator_snapshot():
+    points = trajectory(EXAMPLE)
+
+    assert all(len(point["districts"]) == 5 for point in points)
+    assert all(
+        len(district["indicators"]) == 10
+        for point in points
+        for district in point["districts"]
+    )
+    assert all("D_d" in district for point in points for district in point["districts"])
 
 
 def test_balance_is_district_score_range():

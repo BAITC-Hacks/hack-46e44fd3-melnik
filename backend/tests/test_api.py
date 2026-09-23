@@ -89,3 +89,42 @@ def test_resident_proposal_api_uses_verified_catalog_measure(monkeypatch):
     assert data["evidence"]["measure_effects"][0]["indicator"] == "S2"
     replay = client.post("/api/simulate", json={"selections": data["plan"]["selections"]})
     assert replay.json()["score"] == data["plan"]["score"]
+
+
+def test_proposal_board_api_builds_and_clears_people_scenario(monkeypatch, tmp_path):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("QQ_PROPOSALS_PATH", str(tmp_path / "proposals.json"))
+    created = client.post(
+        "/api/proposals",
+        json={
+            "measure_id": "M6",
+            "text": "Городская программа озеленения",
+            "score": 9999,
+            "votes": 100,
+        },
+    )
+    assert created.status_code == 200
+    proposal = created.json()
+    assert proposal["status"] == "checked"
+    assert proposal["votes"] == 0
+    assert "voter_ids" not in client.get("/api/proposals").json()["proposals"][0]
+
+    voted = client.post(
+        f"/api/proposals/{proposal['id']}/vote", json={"voter_id": "api-test-voter"}
+    )
+    assert voted.status_code == 200
+    assert voted.json()["votes"] == 1
+    built = client.post("/api/proposals/people-scenario", json={})
+    assert built.status_code == 200
+    result = built.json()
+    assert len(result["scenario"]["selections"]) == 5
+    assert result["included"][0]["proposal_id"] == proposal["id"]
+    assert result["blind_max"]["score"] is not None
+
+    digest = client.post("/api/proposals/digest")
+    assert digest.status_code == 200
+    assert sum(theme["votes"] for theme in digest.json()["themes"]) == 1
+
+    cleared = client.delete("/api/proposals")
+    assert cleared.status_code == 200
+    assert client.get("/api/proposals").json() == {"proposals": []}

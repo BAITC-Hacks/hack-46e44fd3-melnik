@@ -24,6 +24,15 @@ def _snapshot(values: dict[str, dict[str, float]]) -> dict:
         for value in indicators.values()
     )
     score = 0.7 * d_avg + 0.3 * district_scores[min_district] - n_crit
+    districts = [
+        {
+            "id": district["id"],
+            "name": district["name"],
+            "D_d": district_scores[district["id"]],
+            "indicators": values[district["id"]],
+        }
+        for district in DISTRICTS
+    ]
     return {
         "score": score,
         "D_avg": d_avg,
@@ -31,6 +40,7 @@ def _snapshot(values: dict[str, dict[str, float]]) -> dict:
         "max_district": max_district,
         "balance": district_scores[max_district] - district_scores[min_district],
         "district_scores": district_scores,
+        "districts": districts,
         "n_crit": n_crit,
     }
 

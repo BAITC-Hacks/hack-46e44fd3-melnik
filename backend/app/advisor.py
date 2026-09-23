@@ -15,7 +15,7 @@ from typing import Any, Literal
 from openai import OpenAI
 from pydantic import BaseModel
 
-from .data import MEASURE_BY_ID
+from .data import DISTRICTS, MEASURE_BY_ID
 from .optimizer import search_scenarios
 from .schemas import Selection
 from .simulator import simulate, validate_selections
@@ -29,10 +29,16 @@ class _SelectionOutput(BaseModel):
     district_id: str | None
 
 
+class _PlacementOutput(BaseModel):
+    measure_id: str
+    district_id: str | None
+
+
 class _ConstraintsOutput(BaseModel):
     exclude: list[str]
     require_measures: list[str]
     require_directions: list[str]
+    require_placements: list[_PlacementOutput]
     objective: Literal["max_score", "min_cost"]
 
 
@@ -125,6 +131,18 @@ _TOOLS = [
                             "exclude": {"type": "array", "items": {"type": "string"}},
                             "require_measures": {"type": "array", "items": {"type": "string"}},
                             "require_directions": {"type": "array", "items": {"type": "string"}},
+                            "require_placements": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "measure_id": {"type": "string"},
+                                        "district_id": {"type": ["string", "null"]},
+                                    },
+                                    "required": ["measure_id", "district_id"],
+                                    "additionalProperties": False,
+                                },
+                            },
                         },
                         "additionalProperties": False,
                     },
@@ -167,13 +185,66 @@ def _fallback_parse(message: str) -> dict[str, Any]:
         match.upper()
         for match in re.findall(r"(?:обязательно|оставь|добавь|включи)\s+(?:мер(?:у|ы)\s+)?(m\d+)", text)
     }
+    keywords = {
+        "M1": ("автобус",),
+        "M2": ("светофор",),
+        "M3": ("лрт", "рельс", "трамва"),
+        "M4": ("парк", "сквер"),
+        "M5": ("топлив", "смог"),
+        "M6": ("озелен", "дерев", "ветрозащит"),
+        "M7": ("школ", "детсад", "детский сад"),
+        "M8": ("поликлиник", "врач"),
+        "M9": ("спорт",),
+        "M10": ("освещ", "камер"),
+        "M11": ("переход", "зебр"),
+        "M12": ("обращен", "обращён", "жалоб"),
+        "M13": ("труб", "жкх", "теплосет", "водосет"),
+        "M14": ("авари", "оповещ"),
+    }
+    recognized_ids = {
+        measure_id
+        for measure_id, terms in keywords.items()
+        if any(term in text for term in terms)
+    }
+    if "авари" in text:
+        recognized_ids.discard("M13")
+    district_aliases = {
+        "esil": ("есиль", "есиле", "есил"),
+        "almaty": ("алматы",),
+        "saryarka": ("сарыарка", "сарыарке"),
+        "baikonur": ("байконур", "байконуре"),
+        "nura": ("нура", "нуре"),
+    }
+    district_id = next(
+        (
+            district["id"]
+            for district in DISTRICTS
+            if any(
+                alias in text
+                for alias in district_aliases.get(
+                    district["id"], (district["name"].casefold(),)
+                )
+            )
+            or district["id"] in text.split()
+        ),
+        None,
+    )
+    placements = [
+        {"measure_id": measure_id, "district_id": district_id}
+        for measure_id in sorted(recognized_ids)
+        if district_id and MEASURE_BY_ID[measure_id]["type"] == "district"
+    ]
+    placed_ids = {item["measure_id"] for item in placements}
+    required_measures |= recognized_ids - placed_ids
+    required_measures -= placed_ids
+    required_measures -= excluded
     require_directions: set[str] = set()
     direction_patterns = {
-        "Экология": r"(?:с|оставь|нужн\w*|обязательн\w*)\s+(?:мер\w*\s+)?эколог",
-        "Транспорт": r"(?:с|оставь|нужн\w*|обязательн\w*)\s+(?:мер\w*\s+)?транспорт",
-        "Соцсфера": r"(?:с|оставь|нужн\w*|обязательн\w*)\s+(?:мер\w*\s+)?соц",
-        "Безопасность": r"(?:с|оставь|нужн\w*|обязательн\w*)\s+(?:мер\w*\s+)?безопас",
-        "Сервисы": r"(?:с|оставь|нужн\w*|обязательн\w*)\s+(?:мер\w*\s+)?сервис",
+        "Экология": r"(?:с\s+эколог|(?:оставь|добавь|включи|нужн\w*|обязательн\w*).{0,24}эколог)",
+        "Транспорт": r"(?:с\s+транспорт|(?:оставь|добавь|включи|нужн\w*|обязательн\w*).{0,24}транспорт)",
+        "Соцсфера": r"(?:соцсфер|социальн\w*\s+инфраструктур)",
+        "Безопасность": r"(?:с\s+безопас|(?:оставь|добавь|включи|нужн\w*|обязательн\w*).{0,24}безопас)",
+        "Сервисы": r"(?:с\s+сервис|(?:оставь|добавь|включи|нужн\w*|обязательн\w*).{0,24}сервис)",
     }
     for direction, pattern in direction_patterns.items():
         if re.search(pattern, text):
@@ -188,7 +259,15 @@ def _fallback_parse(message: str) -> dict[str, Any]:
         "exclude": sorted(item for item in excluded if item in MEASURE_BY_ID),
         "require_measures": sorted(item for item in required_measures if item in MEASURE_BY_ID),
         "require_directions": sorted(require_directions),
+        "require_placements": placements,
         "objective": objective,
+        "recognized": bool(
+            excluded
+            or required_measures
+            or recognized_ids
+            or require_directions
+            or objective == "min_cost"
+        ),
     }
 
 
@@ -208,14 +287,45 @@ def _sanitize_constraints(raw: Any, baseline: dict[str, Any]) -> dict[str, Any]:
         "exclude": ids("exclude"),
         "require_measures": ids("require_measures"),
         "require_directions": sorted({str(value) for value in directions if str(value) in _DIRECTIONS}),
+        "require_placements": [],
         "objective": raw.get("objective", baseline["objective"]),
+        "recognized": baseline.get("recognized", False),
     }
+    known_districts = {item["id"] for item in DISTRICTS}
+    raw_placements = raw.get("require_placements", [])
+    if isinstance(raw_placements, list):
+        for item in raw_placements:
+            if not isinstance(item, dict):
+                continue
+            measure_id = str(item.get("measure_id", "")).upper()
+            district_id = item.get("district_id")
+            measure = MEASURE_BY_ID.get(measure_id)
+            if not measure:
+                continue
+            if measure["type"] == "district" and district_id not in known_districts:
+                continue
+            if measure["type"] == "city":
+                district_id = None
+            result["require_placements"].append(
+                {"measure_id": measure_id, "district_id": district_id}
+            )
+    result["require_placements"] = list(
+        {(item["measure_id"], item["district_id"]): item for item in result["require_placements"]}.values()
+    )
     if result["objective"] not in {"max_score", "min_cost"}:
         result["objective"] = baseline["objective"]
 
     # Explicit phrases recognized locally must not disappear because of an LLM omission.
     for key in ("exclude", "require_measures", "require_directions"):
         result[key] = sorted(set(result[key]) | set(baseline[key]))
+    result["require_placements"] = list(
+        {
+            (item["measure_id"], item["district_id"]): item
+            for item in result["require_placements"] + baseline.get("require_placements", [])
+        }.values()
+    )
+    if any(result[key] for key in ("exclude", "require_measures", "require_directions", "require_placements")):
+        result["recognized"] = True
     if baseline["objective"] == "min_cost":
         result["objective"] = "min_cost"
     return result
@@ -248,7 +358,7 @@ def _simulate_tool(scenario: Any) -> dict[str, Any]:
 def _search_tool(constraints: dict[str, Any], objective: str, limit: int) -> list[dict[str, Any]]:
     search_constraints = {
         key: constraints.get(key, [])
-        for key in ("exclude", "require_measures", "require_directions")
+        for key in ("exclude", "require_measures", "require_directions", "require_placements")
     }
     return search_scenarios(search_constraints, objective=objective, limit=max(1, min(limit, 5)))
 
@@ -383,7 +493,7 @@ def _llm_constraints_and_text(
                 combined["objective"] = arguments.get("objective", baseline["objective"])
                 parsed = _sanitize_constraints(combined, baseline)
                 arguments = {
-                    "constraints": {key: parsed[key] for key in ("exclude", "require_measures", "require_directions")},
+                    "constraints": {key: parsed[key] for key in ("exclude", "require_measures", "require_directions", "require_placements")},
                     "objective": parsed["objective"],
                     "limit": 3,
                 }
@@ -401,7 +511,7 @@ def _llm_constraints_and_text(
     # Structured Outputs is used for the final response.  Candidate numbers are
     # deliberately discarded later and rebuilt locally from simulator output.
     verified_search = searched or _search_tool(
-        {key: parsed[key] for key in ("exclude", "require_measures", "require_directions")},
+        {key: parsed[key] for key in ("exclude", "require_measures", "require_directions", "require_placements")},
         parsed["objective"],
         3,
     )
@@ -450,7 +560,7 @@ def advise(
             source = "deterministic_fallback"
 
     constraints = {
-        key: parsed[key] for key in ("exclude", "require_measures", "require_directions")
+        key: parsed[key] for key in ("exclude", "require_measures", "require_directions", "require_placements")
     }
     try:
         raw_candidates = search_scenarios(
@@ -463,6 +573,11 @@ def advise(
     # The safe sentence is the only place where numeric claims are made.  The
     # optional model prose contains no digits and can only add interpretation.
     safe_text = _safe_recommendation(candidates, current_result)
+    if not parsed.get("recognized", False):
+        safe_text = (
+            "Не удалось распознать условие, показан лучший вариант без ограничений. "
+            + safe_text
+        )
     recommendation = f"{safe_text} {narrative}".strip() if narrative else safe_text
     return {
         "parsed_constraints": parsed,

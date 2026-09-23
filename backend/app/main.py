@@ -21,10 +21,18 @@ from .data import (
     SYNERGIES,
     WEIGHTS,
 )
+from .digest import generate_digest
 from .explainer import explain_result
+from .proposals import (
+    build_people_scenario,
+    clear_proposals,
+    create_proposal,
+    list_proposals,
+    vote_proposal,
+)
 from .public_api import SearchRequest, public_search
 from .resident import propose_resident
-from .schemas import SimulationRequest
+from .schemas import Selection, SimulationRequest
 from .simulator import BASELINE, simulate
 from .trajectory import trajectory
 
@@ -47,6 +55,26 @@ class ResidentRequest(BaseModel):
     district_id: str | None = None
     message: str = Field(min_length=1, max_length=500)
 
+
+class ProposalRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    measure_id: str | None = None
+    district_id: str | None = None
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class VoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    voter_id: str = Field(min_length=1, max_length=128)
+
+
+class PeopleScenarioRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_scenario: list[Selection] | None = None
+
 app = FastAPI(
     title="Аким на 5 часов",
     description="Детерминированный AI-симулятор управления Астаной",
@@ -55,7 +83,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
@@ -189,6 +217,47 @@ def resident_proposal_endpoint(request: ResidentRequest):
     if not message:
         raise HTTPException(status_code=400, detail="Опишите предложение жителя")
     return propose_resident(request.district_id, message)
+
+
+@app.get("/api/proposals")
+def proposals_endpoint():
+    return list_proposals()
+
+
+@app.post("/api/proposals")
+def create_proposal_endpoint(request: ProposalRequest):
+    try:
+        return create_proposal(request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/proposals/{proposal_id}/vote")
+def vote_proposal_endpoint(proposal_id: str, request: VoteRequest):
+    try:
+        return vote_proposal(proposal_id, request.voter_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc.args[0])) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/proposals/people-scenario")
+def people_scenario_endpoint(request: PeopleScenarioRequest | None = None):
+    try:
+        return build_people_scenario(request.current_scenario if request else None)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/proposals")
+def clear_proposals_endpoint():
+    return clear_proposals()
+
+
+@app.post("/api/proposals/digest")
+def proposal_digest_endpoint():
+    return generate_digest()
 
 
 @app.post("/api/search")

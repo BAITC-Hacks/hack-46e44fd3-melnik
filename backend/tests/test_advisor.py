@@ -3,7 +3,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.advisor import advise
+from backend.app.advisor import _fallback_parse, advise
 from backend.app.data import MEASURE_BY_ID
 from backend.app.main import app
 from backend.app.simulator import simulate
@@ -60,3 +60,46 @@ def test_advise_api_returns_candidates_without_api_key(monkeypatch):
     assert payload["source"] == "deterministic_fallback"
     assert payload["candidates"]
     assert all("M3" not in _candidate_ids(candidate) for candidate in payload["candidates"])
+
+
+@pytest.mark.parametrize(
+    ("message", "measure_id"),
+    [
+        ("парк в Есиле", "M4"),
+        ("смог в Нуре", "M5"),
+        ("озеленение", "M6"),
+        ("школа в Алматы", "M7"),
+        ("поликлиника в Нуре", "M8"),
+        ("спорт во дворе", "M9"),
+        ("освещение в Байконуре", "M10"),
+        ("переход у школы", "M11"),
+        ("обращения жителей", "M12"),
+        ("трубы в Алматы", "M13"),
+        ("аварийные бригады", "M14"),
+        ("автобус в Есиле", "M1"),
+        ("светофоры в Есиле", "M2"),
+        ("без ЛРТ", "M3"),
+    ],
+)
+def test_fallback_maps_catalog_keywords(message, measure_id):
+    parsed = _fallback_parse(message)
+    assert parsed["recognized"] is True
+    assert measure_id in parsed["require_measures"] or any(
+        placement["measure_id"] == measure_id for placement in parsed["require_placements"]
+    ) or measure_id in parsed["exclude"]
+
+
+def test_fallback_places_district_measure_in_named_district():
+    parsed = _fallback_parse("Поликлиника в Нуре")
+
+    assert parsed["require_placements"] == [{"measure_id": "M8", "district_id": "nura"}]
+    assert "M8" not in parsed["require_measures"]
+
+
+def test_unrecognized_request_says_unrecognized_and_shows_unconstrained_best(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    result = advise(EXAMPLE, "Расскажи, что происходит с погодой")
+
+    assert result["candidates"]
+    assert "Не удалось распознать условие" in result["recommendation_text"]
