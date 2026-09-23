@@ -1,4 +1,10 @@
 .strategy-dashboard { padding: 30px; border: 1px solid var(--line); border-radius: 26px; background: var(--card); box-shadow: var(--shadow); }
+.trajectory-quarter-control { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+.trajectory-quarter-label { color: var(--muted); font-size: 13px; font-weight: 700; }
+.trajectory-quarter-button { min-height: 38px; padding: 8px 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--navy); background: var(--card); cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; }
+.trajectory-quarter-button:hover { border-color: var(--sky); }
+.trajectory-quarter-button.active { border-color: var(--navy); color: var(--card); background: var(--navy); }
+.trajectory-delay-note { margin: 0 0 14px; color: var(--muted); font-size: 12px; }
 .trajectory-chart-card { position: relative; height: 350px; padding: 20px; border: 1px solid var(--line); border-radius: 19px; background: var(--card); }
 .trajectory-loading, .comparison-placeholder { height: 100%; display: grid; place-items: center; color: var(--muted); text-align: center; }
 .trajectory-loading.error, .comparison-placeholder.error { color: var(--navy); font-weight: 700; }

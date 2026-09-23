@@ -14,6 +14,24 @@
   const theme = () => window.QQTheme;
   let trajectoryChart = null;
   let lastScenarioKey = '';
+  let trajectoryPoints = [];
+  let selectedQuarter = 8;
+
+  window.QQTrajectory = {
+    setPoints(points) {
+      trajectoryPoints = Array.isArray(points) ? points : [];
+      selectedQuarter = trajectoryPoints.some((point) => point.quarter === 8) ? 8 : trajectoryPoints.at(-1)?.quarter;
+      this.selectQuarter(selectedQuarter);
+    },
+    getQuarter: () => selectedQuarter,
+    getPoint: () => trajectoryPoints.find((point) => point.quarter === selectedQuarter) || null,
+    selectQuarter(quarter) {
+      const point = trajectoryPoints.find((item) => item.quarter === Number(quarter));
+      if (!point) return;
+      selectedQuarter = point.quarter;
+      window.dispatchEvent(new CustomEvent('qq:trajectory-quarter', { detail: { quarter: selectedQuarter, point } }));
+    },
+  };
 
   function mount() {
     const resultScreen = select('#result-screen');
@@ -97,6 +115,7 @@
         }),
       ]);
       renderTrajectory(points);
+      window.QQTrajectory.setPoints(points);
 
       const balanced = await post('/api/advise', {
         current_scenario: current.selections,
@@ -165,6 +184,31 @@
       },
     });
   }
+
+  function updateQuarterSummary(event) {
+    const point = event?.detail?.point || window.QQTrajectory.getPoint();
+    if (!point) return;
+    const score = select('#result-score');
+    const delta = select('#result-delta');
+    const caption = select('#score-caption');
+    const result = appState().result;
+    if (score) score.textContent = format(point.score);
+    if (delta && result) {
+      const difference = point.score - result.score_base;
+      delta.textContent = `${difference >= 0 ? '+' : ''}${format(difference)}`;
+    }
+    if (caption && result) {
+      caption.textContent = `Q${point.quarter} · базовый уровень ${format(result.score_base)}. Использовано ${format(result.cost_total, 0)} из ${format(appState().catalog?.budget, 0)} единиц бюджета.`;
+    }
+    const catalog = appState().catalog;
+    const weakest = catalog?.districts?.find((item) => item.id === point.min_district)?.name || point.min_district;
+    const weakMetric = select('#summary-metrics .metric:nth-child(2) strong');
+    if (weakMetric) weakMetric.textContent = weakest || '—';
+    const weakLabel = select('#summary-metrics .metric:nth-child(2) span');
+    if (weakLabel) weakLabel.textContent = `Слабейший район · Q${point.quarter}`;
+  }
+
+  window.addEventListener('qq:trajectory-quarter', updateQuarterSummary);
 
   function bestCandidate(advice) {
     return Array.isArray(advice?.candidates) ? advice.candidates[0] : null;

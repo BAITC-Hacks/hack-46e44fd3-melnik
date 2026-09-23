@@ -7,6 +7,7 @@
     S2: 'Поликлиники', B1: 'Улицы', B2: 'ДТП', C1: 'ЖКХ', C2: 'Обращения',
   };
   let mode = 'after';
+  let selectedQuarter = 8;
   let animationKey = '';
   let animationTimers = [];
 
@@ -53,10 +54,13 @@
   }
 
   function resultDistricts(result) {
+    const point = window.QQTrajectory?.getPoint?.();
+    const quarterById = new Map((point?.districts || []).map((district) => [district.id, district]));
     return result.districts.map((district) => ({
+      id: district.id,
       name: district.name,
       indicators_before: district.indicators_before,
-      indicators_after: district.indicators_after,
+      indicators_after: quarterById.get(district.id)?.indicators || district.indicators_after,
     }));
   }
 
@@ -111,8 +115,41 @@
     }
   }
 
+  function mountQuarterControl() {
+    const matrix = select('#indicator-matrix');
+    const section = matrix?.closest('.indicator-views');
+    if (!section || select('#trajectory-quarter-control')) return;
+    const control = document.createElement('div');
+    control.id = 'trajectory-quarter-control';
+    control.setAttribute('role', 'group');
+    control.setAttribute('aria-label', 'Горизонт прогноза');
+    control.className = 'trajectory-quarter-control';
+    const horizons = { 1: '3 месяца', 2: 'полгода', 4: 'год', 8: '2 года' };
+    control.innerHTML = `<span class="trajectory-quarter-label">Прогноз:</span>${[1, 2, 4, 8].map((quarter) => `<button type="button" data-trajectory-quarter="${quarter}" aria-pressed="${quarter === selectedQuarter}" class="trajectory-quarter-button${quarter === selectedQuarter ? ' active' : ''}">${horizons[quarter]}</button>`).join('')}`;
+    const note = document.createElement('p');
+    note.className = 'trajectory-delay-note';
+    note.textContent = 'Эффект мер наступает с задержкой: школы и ЖКХ дают результат позже, освещение и сервисы — быстрее.';
+    const toolbar = section.querySelector('.matrix-toolbar');
+    if (toolbar) toolbar.before(control);
+    else matrix.before(control);
+    control.after(note);
+    control.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-trajectory-quarter]');
+      if (!button) return;
+      selectedQuarter = Number(button.dataset.trajectoryQuarter);
+      control.querySelectorAll('[data-trajectory-quarter]').forEach((item) => {
+        const active = item === button;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+      window.QQTrajectory?.selectQuarter?.(selectedQuarter);
+      renderResult();
+    });
+  }
+
   function mount() {
     const resultScreen = select('#result-screen');
+    mountQuarterControl();
     document.querySelectorAll('[data-matrix-mode]').forEach((button) => {
       button.addEventListener('click', () => {
         mode = button.dataset.matrixMode;
@@ -132,6 +169,15 @@
     }
     renderBaseline();
     window.addEventListener('qq:catalog-ready', renderBaseline);
+    window.addEventListener('qq:trajectory-quarter', (event) => {
+      selectedQuarter = Number(event.detail?.quarter || 8);
+      document.querySelectorAll('[data-trajectory-quarter]').forEach((item) => {
+        const active = Number(item.dataset.trajectoryQuarter) === selectedQuarter;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+      renderResult();
+    });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });

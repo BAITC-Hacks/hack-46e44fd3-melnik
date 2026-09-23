@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="/static/trajectory.css">
   <link rel="stylesheet" href="/static/insights.css">
   <link rel="stylesheet" href="/static/resident.css">
+  <link rel="stylesheet" href="/static/votes.css">
+  <link rel="stylesheet" href="/static/digest.css">
   <script src="/static/vendor/chart.umd.min.js" defer></script>
   <script src="/static/theme.js" defer></script>
   <script src="/static/app.js" defer></script>
@@ -23,7 +25,7 @@
       <span class="brand-mark">Q</span>
       <span>QalaQadam</span>
     </a>
-    <div class="header-note">Решает человек. Считает код. Объясняет ИИ.</div>
+    <div class="header-note">Город, который слышит</div>
   </header>
 
   <main>
@@ -31,7 +33,7 @@
       <p id="welcome-meta" class="eyebrow">Загружаем параметры города…</p>
       <div class="welcome-layout">
         <div class="welcome-city">
-          <h1>Городу можно помочь стать лучше</h1>
+          <h1>Город в твоих руках</h1>
           <p class="hero-copy">Посмотрите, где поддержка нужна сильнее всего, и соберите понятный план изменений.</p>
           <div class="welcome-matrix-card">
             <div class="welcome-matrix-heading">
@@ -150,6 +152,8 @@
         <div class="section-heading"><div><p class="eyebrow">Прозрачность расчёта</p><h2>Эффекты и синергии</h2></div></div>
         <div id="contributions" class="contributions"></div>
       </section>
+
+      <section id="resident-voting"></section>
     </section>
   </main>
 
@@ -162,5 +166,7 @@
   <script src="/static/matrix.js" defer></script>
   <script src="/static/radar.js" defer></script>
   <script src="/static/resident.js" defer></script>
+  <script src="/static/votes.js" defer></script>
+  <script src="/static/digest.js" defer></script>
 </body>
 </html>

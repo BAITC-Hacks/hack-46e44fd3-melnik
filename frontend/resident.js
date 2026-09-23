@@ -250,6 +250,42 @@
     card.append(block);
   }
 
+  function renderVoteAction(data, card) {
+    const measureId = typeof data.measure === 'string' ? data.measure : data.measure?.id || data.measure_id;
+    if (!measureId) return;
+    const button = appendText(card, 'button', 'primary-button resident-vote-submit', 'Вынести на голосование');
+    button.type = 'button';
+    button.addEventListener('click', async () => {
+      const text = $('#resident-message')?.value.trim() || data.message || measureName(data.measure);
+      const districtValue = data.district;
+      const districtId = typeof districtValue === 'string'
+        ? districtValue || null
+        : districtValue?.id ?? data.district_id ?? null;
+      button.disabled = true;
+      button.textContent = 'Отправляем на доску…';
+      showStatus('Публикуем предложение с проверенными сервером мерой и районом…', 'loading');
+      try {
+        const response = await fetch(api('/api/proposals'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ measure_id: measureId, district_id: districtId, text }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = result.detail || result.message || 'Не удалось вынести предложение на голосование';
+          throw new Error(typeof detail === 'string' ? detail : 'Проверьте предложение и попробуйте ещё раз');
+        }
+        button.textContent = 'Предложение на доске';
+        showStatus('Предложение добавлено на доску голосования.');
+        window.QQVotes?.refresh?.();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = 'Вынести на голосование';
+        showStatus(error.message || 'Не удалось добавить предложение', 'error');
+      }
+    });
+  }
+
   function renderMatched(data) {
     const output = $('#resident-output');
     output.replaceChildren();
@@ -273,6 +309,7 @@
     renderEvidence(data, card);
     renderPlan(data, card);
     renderAppeal(data, card);
+    renderVoteAction(data, card);
     output.append(card);
     output.classList.remove('hidden');
   }
@@ -351,7 +388,9 @@
     const resultScreen = $('#result-screen');
     if (!resultScreen || $('#resident-voice')) return;
     const section = createMarkup();
-    resultScreen.append(section);
+    const voting = $('#resident-voting');
+    if (voting) resultScreen.insertBefore(section, voting);
+    else resultScreen.append(section);
     bind(section);
     populateDistricts(section);
   }
