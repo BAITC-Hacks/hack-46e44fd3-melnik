@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AI-симулятор управленческих решений для Астаны">
+  <title>QalaQadam — Аким на 5 часов</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="QalaQadam">
+      <span class="brand-mark">Q</span>
+      <span>QalaQadam</span>
+    </a>
+    <div class="header-note">AI-симулятор управления городом · Астана</div>
+  </header>
+
+  <main>
+    <section id="selection-screen" class="screen">
+      <div class="hero">
+        <div>
+          <p class="eyebrow">У вас 100 единиц и 8 кварталов</p>
+          <h1>Примите пять решений,<br>которые изменят город</h1>
+          <p class="hero-copy">Выберите мероприятия, укажите районы и найдите баланс между общим ростом и поддержкой самого слабого района.</p>
+        </div>
+        <div class="baseline-card">
+          <span>Стартовый Score</span>
+          <strong id="baseline-score">52.56</strong>
+          <small>2 критических показателя</small>
+        </div>
+      </div>
+
+      <div class="sticky-panel">
+        <div class="counter"><span>Бюджет</span><strong><b id="budget-used">0</b> / 100</strong></div>
+        <div class="counter"><span>Решения</span><strong><b id="decision-count">0</b> / 5</strong></div>
+        <div class="counter"><span>Направления</span><strong><b id="direction-count">0</b> / 5</strong></div>
+        <div class="budget-track"><i id="budget-bar"></i></div>
+        <button id="calculate-button" class="primary-button" disabled>Рассчитать сценарий</button>
+      </div>
+
+      <div class="toolbar">
+        <p id="validation-message" class="validation-message" role="status">Выберите ровно 5 мероприятий</p>
+        <div>
+          <button id="load-example" class="text-button">Загрузить пример из брифа</button>
+          <button id="reset-selection" class="text-button">Сбросить</button>
+        </div>
+      </div>
+
+      <div id="catalog" class="catalog" aria-live="polite"></div>
+    </section>
+
+    <section id="result-screen" class="screen hidden">
+      <button id="back-button" class="back-button">← Изменить решения</button>
+      <div class="result-hero">
+        <div>
+          <p class="eyebrow">Astana Quality of Life Score</p>
+          <div class="score-line">
+            <strong id="result-score">—</strong>
+            <span id="result-delta">—</span>
+          </div>
+          <p id="score-caption" class="hero-copy"></p>
+        </div>
+        <div id="summary-metrics" class="summary-metrics"></div>
+      </div>
+
+      <section class="result-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Результат по территории</p><h2>Районы: до и после</h2></div>
+          <p>Score района учитывает все 10 показателей с весами из брифа.</p>
+        </div>
+        <div class="chart-card"><canvas id="district-chart"></canvas></div>
+        <div id="district-results" class="district-grid"></div>
+      </section>
+
+      <section class="result-section analysis-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Проверяемая интерпретация</p><h2>AI-анализ сценария</h2></div>
+          <span id="explanation-source" class="source-badge">загрузка</span>
+        </div>
+        <div id="analysis-loading" class="analysis-loading">Анализируем компромиссы выбранной политики…</div>
+        <div id="analysis-content" class="analysis-content hidden"></div>
+      </section>
+
+      <section class="result-section">
+        <div class="section-heading"><div><p class="eyebrow">Прозрачность расчёта</p><h2>Эффекты и синергии</h2></div></div>
+        <div id="contributions" class="contributions"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer>QalaQadam · HackAlem AI 2026 · Числа считает код, LLM только объясняет результат</footer>
+</body>
+</html>
