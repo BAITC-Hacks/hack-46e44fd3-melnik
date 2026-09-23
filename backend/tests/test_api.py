@@ -30,6 +30,17 @@ def test_simulate_api_returns_human_reason():
     assert "ровно 5" in response.json()["reason"]
 
 
+def test_trajectory_api_matches_simulation_at_quarter_eight():
+    baseline = client.get("/api/trajectory")
+    assert baseline.status_code == 200
+    assert len(baseline.json()) == 8
+    assert all(round(point["score"], 2) == 52.56 for point in baseline.json())
+
+    response = client.post("/api/trajectory", json={"selections": EXAMPLE})
+    assert response.status_code == 200
+    assert round(response.json()[-1]["score"], 5) == 56.54307
+
+
 def test_explain_recomputes_and_uses_fallback(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     simulation = client.post("/api/simulate", json={"selections": EXAMPLE}).json()
@@ -40,4 +51,3 @@ def test_explain_recomputes_and_uses_fallback(monkeypatch):
     assert data["source"] == "deterministic_fallback"
     assert "56.54" in data["summary"]
     assert "999" not in data["summary"]
-

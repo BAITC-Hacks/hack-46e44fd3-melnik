@@ -24,6 +24,7 @@ from .data import (
 from .explainer import explain_result
 from .schemas import SimulationRequest
 from .simulator import BASELINE, simulate
+from .trajectory import trajectory
 
 load_dotenv()
 
@@ -76,6 +77,16 @@ def advisor_javascript() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "advisor.js", media_type="text/javascript")
 
 
+@app.get("/trajectory.css", include_in_schema=False)
+def trajectory_stylesheet() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "trajectory.css", media_type="text/css")
+
+
+@app.get("/trajectory.js", include_in_schema=False)
+def trajectory_javascript() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "trajectory.js", media_type="text/javascript")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -106,6 +117,19 @@ def catalog() -> dict[str, Any]:
 @app.post("/api/simulate")
 def simulate_endpoint(request: SimulationRequest):
     return simulate(request.selections)
+
+
+@app.get("/api/trajectory")
+def baseline_trajectory_endpoint():
+    return trajectory([])
+
+
+@app.post("/api/trajectory")
+def trajectory_endpoint(request: SimulationRequest):
+    try:
+        return trajectory(request.selections)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/explain")
