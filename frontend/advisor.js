@@ -21,6 +21,8 @@
     const parsed = number(value);
     return parsed === null ? '—' : parsed.toFixed(digits);
   };
+  let renderedCandidates = [];
+  let renderedCondition = '';
 
   function mount() {
     const resultScreen = select('#result-screen');
@@ -32,9 +34,9 @@
     section.innerHTML = `
       <div class="advisor-heading">
         <div>
-          <p class="eyebrow">Policy copilot</p>
-          <h2>Задайте ограничения словами</h2>
-          <p>ИИ переводит запрос в формальные условия. Допустимые сценарии ищет и пересчитывает код.</p>
+          <p class="eyebrow">Советник акима</p>
+          <h2>Задайте приоритеты словами</h2>
+          <p>Опишите словами, что важно, — советник найдёт допустимые варианты, код их пересчитает.</p>
         </div>
         <span id="advisor-source" class="advisor-source hidden"></span>
       </div>
@@ -55,6 +57,7 @@
 
     resultScreen.appendChild(section);
     select('#advisor-form').addEventListener('submit', requestAdvice);
+    select('#advisor-output').addEventListener('click', applyCandidate);
     section.querySelectorAll('[data-advisor-example]').forEach((button) => {
       button.addEventListener('click', () => {
         select('#advisor-message').value = button.dataset.advisorExample;
@@ -93,7 +96,7 @@
         const detail = typeof data.detail === 'string' ? data.detail : data.detail?.message;
         throw new Error(detail || 'Не удалось получить рекомендацию');
       }
-      renderAdvice(data);
+      renderAdvice(data, message);
       status.textContent = '';
       status.className = 'advisor-status';
     } catch (error) {
@@ -172,7 +175,30 @@
       </div>
       <div class="candidate-measures">${selectionsList.map((item) => `<span>${safeHtml(measureLabel(item))}</span>`).join('')}</div>
       ${diffMarkup(candidate)}
+      <button type="button" class="candidate-apply" data-candidate-index="${index}">Применить сценарий</button>
     </article>`;
+  }
+
+  async function applyCandidate(event) {
+    const button = event.target.closest('[data-candidate-index]');
+    if (!button) return;
+    const index = Number(button.dataset.candidateIndex);
+    const candidate = renderedCandidates[index];
+    const scenario = scenarioSelections(candidate);
+    if (!scenario.length || typeof window.QQApp?.applyScenario !== 'function') return;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Проверяем кодом…';
+    try {
+      await window.QQApp.applyScenario(scenario, renderedCondition);
+    } catch (error) {
+      const status = select('#advisor-status');
+      status.className = 'advisor-status error';
+      status.textContent = error instanceof Error ? error.message : 'Не удалось применить сценарий';
+    } finally {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
   }
 
   function constraintsMarkup(constraints) {
@@ -191,9 +217,11 @@
     return labels.length ? `<div class="advisor-constraints">${labels.join('')}</div>` : '';
   }
 
-  function renderAdvice(data) {
+  function renderAdvice(data, condition) {
     const output = select('#advisor-output');
     const candidates = Array.isArray(data.candidates) ? data.candidates.slice(0, 3) : [];
+    renderedCandidates = candidates;
+    renderedCondition = String(condition || '').trim().slice(0, 120);
     const source = String(data.source ?? data.mode ?? (data.fallback ? 'fallback' : 'openai'));
     const isFallback = source.toLowerCase().includes('fallback') || source.toLowerCase().includes('резерв');
     const sourceBadge = select('#advisor-source');

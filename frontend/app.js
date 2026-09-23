@@ -1,4 +1,12 @@
-const state = { catalog: null, selected: new Map(), result: null, chart: null, scoreAnimation: null };
+const state = {
+  catalog: null,
+  selected: new Map(),
+  result: null,
+  chart: null,
+  scoreAnimation: null,
+  scenarioReturnSelections: null,
+  scenarioSourceLabel: '',
+};
 const $ = (selector) => document.querySelector(selector);
 const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
 const api = (path) => `${API_BASE}${path}`;
@@ -205,6 +213,8 @@ async function calculate() {
     const response = await fetch(api('/api/simulate'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({selections: selections()}) });
     const result = await response.json();
     if (!result.valid) throw new Error(result.reason);
+    state.scenarioReturnSelections = null;
+    state.scenarioSourceLabel = '';
     state.result = result;
     renderResult();
     showScreen('result');
@@ -228,6 +238,7 @@ function showScreen(name) {
 
 function renderResult() {
   const r = state.result;
+  renderScenarioBanner();
   animateScore(r.score_base, r.score);
   $('#result-delta').textContent = `${r.delta >= 0 ? '+' : ''}${r.delta.toFixed(2)}`;
   $('#score-caption').textContent = `Базовый уровень ${r.score_base.toFixed(2)}. Использовано ${r.cost_total} из ${state.catalog.budget} единиц бюджета.`;
@@ -240,6 +251,97 @@ function renderResult() {
   renderChart(r);
   $('#district-results').innerHTML = r.districts.map(districtCard).join('');
   renderContributions(r);
+}
+
+function normalizedSelections(items) {
+  if (!Array.isArray(items)) throw new Error('Сценарий должен содержать список решений');
+  return items.map((item) => ({
+    measure_id: item?.measure_id ?? item?.id,
+    district_id: item?.district_id ?? null,
+  }));
+}
+
+async function simulateAndOpen(items, sourceLabel, rememberOriginal) {
+  const proposed = normalizedSelections(items);
+  const response = await fetch(api('/api/simulate'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ selections: proposed }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.valid) {
+    const detail = result.reason || result.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Не удалось проверить сценарий');
+  }
+
+  if (rememberOriginal && !state.scenarioReturnSelections) {
+    state.scenarioReturnSelections = normalizedSelections(state.result?.selections ?? selections());
+  }
+  state.scenarioSourceLabel = String(sourceLabel || '').trim();
+  state.selected = new Map(proposed.map((item) => [item.measure_id, item.district_id]));
+  state.result = result;
+  renderCatalog();
+  updateValidation();
+  renderResult();
+  // The result may already be visible. A brief class toggle wakes the existing
+  // chart observers without introducing a second render path or showing another screen.
+  $('#result-screen').classList.add('hidden');
+  showScreen('result');
+  loadExplanation(result);
+  return result;
+}
+
+async function applyScenario(items, sourceLabel) {
+  return simulateAndOpen(items, sourceLabel, true);
+}
+
+async function restoreUserScenario() {
+  if (!state.scenarioReturnSelections) return null;
+  const original = normalizedSelections(state.scenarioReturnSelections);
+  const previousSource = state.scenarioSourceLabel;
+  state.scenarioReturnSelections = null;
+  state.scenarioSourceLabel = '';
+  try {
+    return await simulateAndOpen(original, '', false);
+  } catch (error) {
+    state.scenarioReturnSelections = original;
+    state.scenarioSourceLabel = previousSource;
+    throw error;
+  }
+}
+
+function renderScenarioBanner() {
+  const resultScreen = $('#result-screen');
+  if (!resultScreen) return;
+  let banner = $('#scenario-source-banner');
+  if (!state.scenarioReturnSelections || !state.scenarioSourceLabel) {
+    banner?.remove();
+    return;
+  }
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'scenario-source-banner';
+    banner.className = 'scenario-source-banner';
+    const hero = resultScreen.querySelector('.result-hero');
+    if (hero) hero.before(banner);
+    else resultScreen.prepend(banner);
+  }
+  const resident = state.scenarioSourceLabel.toLowerCase().startsWith('предложение жителя');
+  const description = resident
+    ? state.scenarioSourceLabel
+    : `Сценарий от советника: ${state.scenarioSourceLabel}`;
+  banner.innerHTML = `<span>${escapeHtml(description)}</span><button type="button" class="scenario-restore">Вернуться к моему сценарию</button>`;
+  banner.querySelector('.scenario-restore').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Восстанавливаем…';
+    try {
+      await restoreUserScenario();
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = error instanceof Error ? error.message : 'Не удалось восстановить сценарий';
+    }
+  });
 }
 
 function animateScore(from, to) {
@@ -343,6 +445,8 @@ function renderContributions(result) {
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 }
+
+window.QQApp = Object.assign(window.QQApp || {}, { applyScenario });
 
 init().catch(error => {
   document.body.innerHTML = `<main class="screen"><h1>Не удалось запустить интерфейс</h1><p>${escapeHtml(error.message)}</p></main>`;
