@@ -16,10 +16,14 @@
 .resident-field select { height: 49px; padding: 0 13px; }
 .resident-field textarea { min-height: 76px; padding: 12px 14px; resize: vertical; }
 .resident-field select:focus, .resident-field textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sky) 15%, transparent); }
+.resident-field select.resident-district-required { border-color: var(--data-low, #c24136); box-shadow: 0 0 0 4px color-mix(in srgb, var(--data-low, #c24136) 18%, transparent); }
 .resident-submit { min-height: 49px; margin-bottom: 0; }
 .resident-chips { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 7px; }
 .resident-chips button { padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--sky) 32%, var(--line)); border-radius: 99px; color: var(--navy); background: var(--card); cursor: pointer; font-size: 12px; }
 .resident-chips button:hover { border-color: var(--sky); background: var(--sky-2); }
+.resident-district-hint { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--gold); border-radius: 12px; color: var(--navy); background: color-mix(in srgb, var(--gold) 14%, var(--card)); font-size: 13px; }
+.resident-hint-action { padding: 5px 9px; border: 1px solid var(--navy); border-radius: 8px; color: var(--navy); background: var(--card); cursor: pointer; font: inherit; font-weight: 700; }
+.resident-hint-action:hover, .resident-hint-action:focus-visible { background: var(--sky-2); }
 .resident-disclaimer { margin: 16px 0 0; color: var(--muted); font-size: 12px; }
 .resident-status { min-height: 22px; margin-top: 14px; color: var(--muted); }
 .resident-status.loading::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 9px; border: 2px solid var(--line); border-top-color: var(--sky); border-radius: 50%; animation: resident-spin .7s linear infinite; }
@@ -47,6 +51,7 @@
 .resident-secondary-button:hover { background: var(--sky-2); }
 .resident-unmatched { border-style: dashed; }
 .resident-unmatched p { color: var(--muted); }
+.resident-needs-district { border-color: var(--data-low, #c24136); }
 
 @media (max-width: 900px) {
   .resident-form { grid-template-columns: 1fr 1fr; }

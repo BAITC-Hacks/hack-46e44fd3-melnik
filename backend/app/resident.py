@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Any
 
@@ -58,10 +59,28 @@ def _normalise_text(value: str) -> str:
     return " ".join(re.findall(r"[a-zа-яё]+", value.casefold()))
 
 
+_DISTRICT_FORMS = {
+    "esil": {"есиль", "есиля", "есиле", "есилю", "есилем"},
+    "almaty": {"алматы", "алмате"},
+    "saryarka": {"сарыарка", "сарыарки", "сарыарке", "сарыарку", "сарыаркой", "сарыаркою"},
+    "baikonur": {"байконур", "байконура", "байконуре", "байконуру", "байконуром"},
+    "nura": {"нура", "нуры", "нуре", "нуру", "нурой", "нурою"},
+}
+
+
+def _has_keyword(words: list[str], keyword: str) -> bool:
+    """Match stems at word starts, never inside another word (e.g. аквапарк)."""
+    stems = _normalise_text(keyword).split()
+    return any(
+        all(words[start + offset].startswith(stem) for offset, stem in enumerate(stems))
+        for start in range(len(words) - len(stems) + 1)
+    )
+
+
 def _keyword_scores(message: str) -> dict[str, int]:
-    text = _normalise_text(message)
+    words = _normalise_text(message).split()
     return {
-        measure_id: sum(keyword in text for keyword in keywords)
+        measure_id: sum(_has_keyword(words, keyword) for keyword in keywords)
         for measure_id, keywords in _KEYWORDS.items()
     }
 
@@ -74,9 +93,26 @@ def _fallback_match(message: str) -> str | None:
 
 def _nearest_measures(message: str, limit: int = 3) -> list[str]:
     scores = _keyword_scores(message)
+    words = _normalise_text(message).split()
+
+    def lexical_similarity(measure_id: str) -> float:
+        return max(
+            (
+                SequenceMatcher(None, word, stem).ratio()
+                for word in words
+                for keyword in _KEYWORDS[measure_id]
+                for stem in _normalise_text(keyword).split()
+            ),
+            default=0.0,
+        )
+
     ranked = sorted(
         MEASURES,
-        key=lambda measure: (-scores[measure["id"]], measure["id"]),
+        key=lambda measure: (
+            -scores[measure["id"]],
+            -lexical_similarity(measure["id"]),
+            measure["id"],
+        ),
     )
     return [measure["name"] for measure in ranked[:limit]]
 
@@ -84,9 +120,9 @@ def _nearest_measures(message: str, limit: int = 3) -> list[str]:
 def _infer_district(district_id: str | None, message: str) -> str | None:
     if district_id is not None:
         return district_id if district_id in DISTRICT_BY_ID else None
-    text = _normalise_text(message)
+    words = set(_normalise_text(message).split())
     for district in DISTRICTS:
-        if district["name"].casefold() in text:
+        if words.intersection(_DISTRICT_FORMS[district["id"]]):
             return district["id"]
     return None
 
@@ -150,6 +186,24 @@ def _unmatched(message: str, reason: str | None = None) -> dict[str, Any]:
     }
 
 
+def _needs_district(measure: dict[str, Any], source: str) -> dict[str, Any]:
+    return {
+        "matched": False,
+        "needs_district": True,
+        "measure": {"id": measure["id"], "name": measure["name"]},
+        "district": None,
+        "evidence": None,
+        "plan": None,
+        "max_score": None,
+        "appeal": {
+            "title": f"Нашли меру: {measure['name']}",
+            "body": "Выберите район, чтобы рассчитать предложение.",
+        },
+        "alternatives": [],
+        "source": source,
+    }
+
+
 def _measure_payload(measure: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": measure["id"],
@@ -203,6 +257,12 @@ def _build_appeal(
 def propose_resident(district_id: str | None, message: str) -> dict[str, Any]:
     """Match one catalog measure and produce a fully verified resident proposal."""
     fallback_measure_id = _fallback_match(message or "")
+    # An aquapark is not the catalog's public park/skver measure. Keep this
+    # out-of-catalog case deterministic even when a language model is enabled.
+    if fallback_measure_id is None and any(
+        word.startswith("аквапарк") for word in _normalise_text(message or "").split()
+    ):
+        return _unmatched(message or "")
     llm_measure_id, llm_prose = (
         (None, "") if fallback_measure_id else _llm_match(message or "")
     )
@@ -214,10 +274,7 @@ def propose_resident(district_id: str | None, message: str) -> dict[str, Any]:
     measure = MEASURE_BY_ID[measure_id]
     inferred_district = _infer_district(district_id, message or "")
     if measure["type"] == "district" and inferred_district is None:
-        return _unmatched(
-            message or "",
-            "Для этой районной меры сначала выберите район.",
-        )
+        return _needs_district(measure, source)
     placement_district = inferred_district if measure["type"] == "district" else None
     placement = {"measure_id": measure_id, "district_id": placement_district}
     candidates = search_scenarios(

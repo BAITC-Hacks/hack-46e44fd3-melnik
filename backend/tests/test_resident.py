@@ -60,3 +60,66 @@ def test_unmatched_response_has_no_digits_in_text(monkeypatch) -> None:
 )
 def test_demo_chip_keyword_fallback(message: str, expected_measure: str) -> None:
     assert _fallback_match(message) == expected_measure
+
+
+@pytest.mark.parametrize(
+    ("message", "measure_id", "district_id"),
+    [
+        ("В Нуре не хватает поликлиник", "M8", "nura"),
+        ("Больше зелени в Сарыарке", "M4", "saryarka"),
+    ],
+)
+def test_district_in_text_produces_verified_plan(
+    monkeypatch, message: str, measure_id: str, district_id: str
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    result = propose_resident(None, message)
+
+    assert result["matched"] is True
+    assert result["measure"]["id"] == measure_id
+    assert result["district"]["id"] == district_id
+    assert {"measure_id": measure_id, "district_id": district_id} in result["plan"]["selections"]
+    assert result["plan"]["score"] == pytest.approx(
+        simulate(result["plan"]["selections"]).score
+    )
+
+
+def test_explicit_district_overrides_text(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    result = propose_resident("esil", "В Нуре не хватает поликлиник")
+
+    assert result["matched"] is True
+    assert result["district"]["id"] == "esil"
+
+
+@pytest.mark.parametrize("district_id", [None, "nura", "esil", "saryarka", "baikonur", "almaty"])
+def test_aquapark_is_not_catalog_park(monkeypatch, district_id: str | None) -> None:
+    monkeypatch.setattr(
+        "backend.app.resident._llm_match",
+        lambda message: ("M4", "Сомнительное совпадение"),
+    )
+
+    result = propose_resident(district_id, "Хочу аквапарк на Луне")
+
+    assert result["matched"] is False
+    assert result["measure"] is None
+    assert result["evidence"] is None
+    assert result["plan"] is None
+    assert "Такой меры нет в каталоге симулятора" in result["appeal"]["body"]
+    assert all(re.search(r"\d", text) is None for text in _text_values(result))
+
+
+def test_found_measure_without_district_requests_selection(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    result = propose_resident(None, "Не хватает поликлиник")
+
+    assert result["matched"] is False
+    assert result["needs_district"] is True
+    assert result["measure"]["id"] == "M8"
+    assert result["plan"] is None
+    assert result["evidence"] is None
+    assert "Нашли меру" in result["appeal"]["title"]
+    assert "Выберите район" in result["appeal"]["body"]

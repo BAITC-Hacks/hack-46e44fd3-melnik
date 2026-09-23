@@ -35,6 +35,7 @@
           <button type="button" data-resident-example="Темно на улицах">Темно на улицах</button>
           <button type="button" data-resident-example="Плохой воздух">Плохой воздух</button>
         </div>
+        <div id="resident-district-hint" class="resident-district-hint hidden" role="status"></div>
         <button class="primary-button resident-submit" type="submit">Проверить предложение</button>
       </form>
       <p class="resident-disclaimer">Черновик. В демо обращение никуда не отправляется.</p>
@@ -110,7 +111,7 @@
     output.replaceChildren();
     const card = document.createElement('article');
     card.className = 'resident-unmatched';
-    appendText(card, 'h3', '', data.appeal?.title || 'Такой меры пока нет в каталоге симулятора');
+    appendText(card, 'h3', '', 'Такой меры нет в каталоге симулятора');
     appendText(card, 'p', '', data.appeal?.body || data.message || data.reason || 'Попробуйте описать задачу иначе или выбрать один из ближайших вариантов.');
     const alternatives = Array.isArray(data.alternatives) ? data.alternatives : [];
     if (alternatives.length) {
@@ -121,6 +122,79 @@
     }
     output.append(card);
     output.classList.remove('hidden');
+  }
+
+  function clearDistrictPrompt() {
+    const select = $('#resident-district');
+    if (!select) return;
+    select.classList.remove('resident-district-required');
+    select.removeAttribute('aria-invalid');
+    select.removeAttribute('aria-describedby');
+  }
+
+  const DISTRICT_FORMS = {
+    esil: ['есиль', 'есиля', 'есиле', 'есилю', 'есилем'],
+    almaty: ['алматы'],
+    saryarka: ['сарыарка', 'сарыарки', 'сарыарке', 'сарыарку', 'сарыаркой'],
+    baikonur: ['байконур', 'байконура', 'байконуре', 'байконуру', 'байконуром'],
+    nura: ['нура', 'нуры', 'нуре', 'нуру', 'нурой'],
+  };
+
+  function mentionedDistrict(message) {
+    const tokens = (message.toLocaleLowerCase('ru').match(/[а-яё]+/gu) || []);
+    const mentioned = Object.entries(DISTRICT_FORMS)
+      .filter(([, forms]) => forms.some((form) => tokens.includes(form)))
+      .map(([id]) => id);
+    return mentioned.length === 1 ? mentioned[0] : null;
+  }
+
+  function updateDistrictHint() {
+    const hint = $('#resident-district-hint');
+    const selected = $('#resident-district')?.value;
+    const mentioned = mentionedDistrict($('#resident-message')?.value || '');
+    hint.replaceChildren();
+    if (!selected || !mentioned || selected === mentioned) {
+      hint.classList.add('hidden');
+      return;
+    }
+    const name = districtName(mentioned);
+    appendText(hint, 'span', '', `В тексте упомянут район ${name} — рассчитать для него?`);
+    const change = appendText(hint, 'button', 'resident-hint-action', `Выбрать ${name}`);
+    change.type = 'button';
+    change.addEventListener('click', () => {
+      $('#resident-district').value = mentioned;
+      clearDistrictPrompt();
+      invalidateResult();
+      updateDistrictHint();
+      $('#resident-district').focus();
+    });
+    hint.classList.remove('hidden');
+  }
+
+  function invalidateResult() {
+    latestResponse = null;
+    const output = $('#resident-output');
+    output.replaceChildren();
+    output.classList.add('hidden');
+    showStatus();
+  }
+
+  function renderNeedsDistrict(data) {
+    const output = $('#resident-output');
+    output.replaceChildren();
+    const card = document.createElement('article');
+    card.className = 'resident-unmatched resident-needs-district';
+    appendText(card, 'h3', '', `Нашли меру: ${measureName(data.measure)}. Выберите район`);
+    appendText(card, 'p', '', 'Укажите район выше и снова нажмите «Проверить предложение», чтобы увидеть расчёт.');
+    output.append(card);
+    output.classList.remove('hidden');
+    const select = $('#resident-district');
+    if (select) {
+      select.classList.add('resident-district-required');
+      select.setAttribute('aria-invalid', 'true');
+      select.setAttribute('aria-describedby', 'resident-status');
+      select.focus();
+    }
   }
 
   function renderEvidence(data, card) {
@@ -316,7 +390,8 @@
 
   function renderResponse(data) {
     latestResponse = data;
-    if (!data?.matched) renderUnmatched(data || {});
+    if (data?.needs_district) renderNeedsDistrict(data);
+    else if (!data?.matched) renderUnmatched(data || {});
     else renderMatched(data);
   }
 
@@ -334,6 +409,7 @@
     const districtId = $('#resident-district').value || null;
     const message = $('#resident-message').value.trim();
     if (!message) return;
+    clearDistrictPrompt();
     submitButton.disabled = true;
     $('#resident-output').classList.add('hidden');
     showStatus('Сопоставляем предложение с каталогом и проверяем план…', 'loading');
@@ -346,7 +422,11 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || 'Не удалось проверить предложение');
       renderResponse(data);
-      showStatus(data.matched ? 'Предложение проверено кодом.' : 'Совпадение в каталоге не найдено.');
+      showStatus(data.matched
+        ? 'Предложение проверено кодом.'
+        : data.needs_district
+          ? 'Мера найдена. Выберите район для расчёта.'
+          : 'Совпадение в каталоге не найдено.');
     } catch (error) {
       latestResponse = null;
       showStatus(error.message || 'Сервис временно недоступен', 'error');
@@ -357,13 +437,24 @@
 
   function bind(section) {
     $('#resident-form', section).addEventListener('submit', submit);
+    $('#resident-district', section).addEventListener('change', () => {
+      clearDistrictPrompt();
+      invalidateResult();
+      updateDistrictHint();
+    });
+    $('#resident-message', section).addEventListener('input', () => {
+      clearDistrictPrompt();
+      invalidateResult();
+      updateDistrictHint();
+    });
     section.querySelectorAll('[data-resident-example]').forEach((button) => {
       button.addEventListener('click', () => {
         $('#resident-message').value = button.dataset.residentExample;
         const district = button.dataset.district;
-        if (district && $('#resident-district').querySelector(`option[value="${district}"]`)) {
-          $('#resident-district').value = district;
-        }
+        $('#resident-district').value = district || '';
+        clearDistrictPrompt();
+        invalidateResult();
+        updateDistrictHint();
         $('#resident-message').focus();
       });
     });
