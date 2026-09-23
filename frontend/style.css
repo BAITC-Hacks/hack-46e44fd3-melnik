@@ -47,15 +47,15 @@ h2 { margin: 0; font-size: clamp(25px, 3vw, 36px); line-height: 1.15; letter-spa
 
 /* Welcome: matrix stays the dominant object and fits a 1440x900 viewport. */
 .welcome-screen { min-height: calc(100vh - 64px); padding-block: 28px 34px; }
-.welcome-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: stretch; }
+.welcome-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
 .welcome-city { min-width: 0; }
 .welcome-city h1 { font-size: clamp(30px, 3.5vw, 52px); }
 .welcome-matrix-card { margin-top: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 22px; background: var(--card); box-shadow: var(--shadow); }
 .welcome-matrix-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 12px; }
 .welcome-matrix-heading h2 { font-size: 20px; }
-.baseline-weakness { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+.baseline-weakness { margin: 14px 0 0; padding: 11px 14px; border-left: 4px solid var(--data-low); border-radius: 0 10px 10px 0; color: var(--navy); background: color-mix(in srgb, var(--data-low) 8%, var(--card)); font-size: 16px; font-weight: 700; }
 .welcome-score-card, .selection-score-card { padding: 24px; border-radius: 24px; color: var(--card); background: var(--navy); box-shadow: var(--shadow); }
-.welcome-score-card { min-height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+.welcome-score-card { display: flex; flex-direction: column; gap: 18px; }
 .welcome-score-card strong, .selection-score-card strong { color: var(--gold); font-family: var(--font-heading); font-variant-numeric: tabular-nums; }
 .welcome-score-card strong { font-size: 54px; line-height: 1; }
 .welcome-score-card .primary-button { width: 100%; }
@@ -146,10 +146,11 @@ h2 { margin: 0; font-size: clamp(25px, 3vw, 36px); line-height: 1.15; letter-spa
 .contribution small { color: var(--muted); }
 .synergy { border-color: var(--gold); border-left-color: var(--gold); background: color-mix(in srgb, var(--gold) 13%, var(--card)); }
 footer { padding: 34px 18px; border-top: 1px solid var(--line); color: var(--muted); text-align: center; font-size: 12px; }
+footer a { color: var(--sky); font-weight: 750; }
 
 @media (max-width: 900px) {
   .welcome-layout { grid-template-columns: 1fr; }
-  .welcome-score-card { min-height: 200px; }
+  .welcome-score-card { min-height: 0; }
   .measure-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .sticky-panel { grid-template-columns: repeat(3,1fr); }
   .sticky-panel .budget-track { grid-column: 1 / 3; }

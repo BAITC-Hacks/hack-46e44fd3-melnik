@@ -7,7 +7,7 @@
 .matrix-scroll { overflow-x: auto; padding-bottom: 5px; }
 .matrix-grid { min-width: 920px; display: grid; grid-template-columns: 118px repeat(10, minmax(66px, 1fr)); gap: 5px; align-items: stretch; }
 .matrix-code, .matrix-row-label, .matrix-cell { min-height: 45px; display: grid; place-items: center; border-radius: 9px; }
-.matrix-code { min-height: 32px; color: var(--muted); font-size: 12px; font-weight: 850; cursor: help; }
+.matrix-code { min-height: 36px; padding: 2px; color: var(--muted); font-size: 10px; font-weight: 850; line-height: 1.1; text-align: center; overflow-wrap: anywhere; cursor: help; }
 .matrix-row-label { justify-items: start; padding-left: 8px; font-weight: 750; }
 .matrix-cell { border: 1px solid color-mix(in srgb, var(--navy) 7%, transparent); color: var(--navy); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 750; cursor: help; transition: transform .12s, box-shadow .12s, background-color .2s; }
 .matrix-cell-critical { outline: 2px solid var(--data-low); outline-offset: 1px; box-shadow: inset 0 0 0 2px var(--card); }

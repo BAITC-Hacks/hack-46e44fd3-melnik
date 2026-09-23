@@ -2,6 +2,10 @@
   'use strict';
 
   const INDICATORS = ['T1', 'T2', 'E1', 'E2', 'S1', 'S2', 'B1', 'B2', 'C1', 'C2'];
+  const SHORT_LABELS = {
+    T1: 'Дороги', T2: 'Транспорт', E1: 'Зелень', E2: 'Воздух', S1: 'Школы',
+    S2: 'Поликлиники', B1: 'Улицы', B2: 'ДТП', C1: 'ЖКХ', C2: 'Обращения',
+  };
   let mode = 'after';
   let animationKey = '';
   let animationTimers = [];
@@ -25,7 +29,7 @@
 
   function matrixMarkup(districts, names, selectedMode, animate) {
     const headers = INDICATORS.map((code) =>
-      `<div class="matrix-code" title="${names[code] || code}">${code}</div>`
+      `<div class="matrix-code" title="${code} · ${names[code] || code}">${SHORT_LABELS[code]}</div>`
     ).join('');
     let cellIndex = 0;
     const rows = districts.map((district) => {
