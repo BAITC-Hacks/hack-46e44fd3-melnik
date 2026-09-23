@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from sqlalchemy.orm import Session
-from app.db import Base, engine, get_db
+
 from app import models
+from app.db import Base, engine, get_db
 from app.openai_client import chat
 
 Base.metadata.create_all(bind=engine)
@@ -18,5 +19,5 @@ def ask(prompt: str):
     return {"answer": resp.choices[0].message.content}
 
 @app.get("/items")
-def list_items(db: Session = Depends(get_db)):
+def list_items(db: Session = Depends(get_db)):  # noqa: B008
     return db.query(models.Item).all()
