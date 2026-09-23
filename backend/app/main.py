@@ -22,6 +22,7 @@ from .data import (
     WEIGHTS,
 )
 from .explainer import explain_result
+from .resident import propose_resident
 from .schemas import SimulationRequest
 from .simulator import BASELINE, simulate
 from .trajectory import trajectory
@@ -36,6 +37,13 @@ class AdvisorRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     current_scenario: list[dict[str, Any]] | None = None
+    message: str = Field(min_length=1, max_length=500)
+
+
+class ResidentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    district_id: str | None = None
     message: str = Field(min_length=1, max_length=500)
 
 app = FastAPI(
@@ -167,3 +175,11 @@ def advise_endpoint(request: AdvisorRequest):
     if not message:
         raise HTTPException(status_code=400, detail="Запрос советнику не может быть пустым")
     return advise(request.current_scenario, message)
+
+
+@app.post("/api/resident/propose")
+def resident_proposal_endpoint(request: ResidentRequest):
+    message = request.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Опишите предложение жителя")
+    return propose_resident(request.district_id, message)

@@ -1,0 +1,71 @@
+.resident-section {
+  padding: 32px;
+  border: 1px solid color-mix(in srgb, var(--sky) 28%, var(--line));
+  border-radius: 26px;
+  background: linear-gradient(145deg, var(--card), var(--sky-2));
+  box-shadow: var(--shadow);
+}
+
+.resident-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
+.resident-heading h2 { margin-bottom: 10px; }
+.resident-heading p:last-child { max-width: 720px; margin: 0; color: var(--muted); }
+.resident-demo-badge { flex: none; padding: 6px 10px; border-radius: 99px; color: var(--navy); background: var(--gold); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.resident-form { display: grid; grid-template-columns: minmax(180px, .35fr) minmax(280px, 1fr) auto; gap: 12px; align-items: end; margin-top: 24px; }
+.resident-field { display: grid; gap: 7px; color: var(--navy); font-size: 13px; font-weight: 700; }
+.resident-field select, .resident-field textarea { width: 100%; border: 1px solid var(--line); border-radius: 13px; outline: 0; color: var(--navy); background: var(--card); font: inherit; font-weight: 400; transition: border-color .15s, box-shadow .15s; }
+.resident-field select { height: 49px; padding: 0 13px; }
+.resident-field textarea { min-height: 76px; padding: 12px 14px; resize: vertical; }
+.resident-field select:focus, .resident-field textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sky) 15%, transparent); }
+.resident-submit { min-height: 49px; margin-bottom: 0; }
+.resident-chips { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 7px; }
+.resident-chips button { padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--sky) 32%, var(--line)); border-radius: 99px; color: var(--navy); background: var(--card); cursor: pointer; font-size: 12px; }
+.resident-chips button:hover { border-color: var(--sky); background: var(--sky-2); }
+.resident-disclaimer { margin: 16px 0 0; color: var(--muted); font-size: 12px; }
+.resident-status { min-height: 22px; margin-top: 14px; color: var(--muted); }
+.resident-status.loading::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 9px; border: 2px solid var(--line); border-top-color: var(--sky); border-radius: 50%; animation: resident-spin .7s linear infinite; }
+.resident-status.error { color: var(--navy); font-weight: 700; }
+@keyframes resident-spin { to { transform: rotate(360deg); } }
+.resident-output { margin-top: 8px; }
+.resident-result-card, .resident-unmatched { padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--card); }
+.resident-result-card > h3, .resident-unmatched h3 { margin: 5px 0 8px; font-size: 20px; }
+.resident-result-label { margin: 0; color: var(--sky); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.resident-result-meta, .resident-muted { margin: 0; color: var(--muted); }
+.resident-evidence, .resident-plan, .resident-appeal { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.resident-evidence h3, .resident-plan h3, .resident-appeal h3 { margin: 0 0 10px; font-family: var(--font-body); font-size: 14px; }
+.resident-evidence ul { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.resident-evidence li { padding: 6px 9px; border-radius: 9px; background: var(--sky-2); font-size: 12px; }
+.resident-score-shift { margin: 12px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.resident-plan-metrics { display: flex; flex-wrap: wrap; gap: 10px; }
+.resident-plan-metrics div { min-width: 160px; padding: 13px 15px; border-radius: 14px; color: var(--card); background: var(--navy); }
+.resident-plan-metrics span { display: block; color: color-mix(in srgb, var(--card) 70%, transparent); font-size: 11px; }
+.resident-plan-metrics strong { display: block; margin-top: 4px; color: var(--gold); font-family: var(--font-heading); font-size: 24px; font-variant-numeric: tabular-nums; }
+.resident-apply { margin-top: 12px; }
+.resident-appeal-title { display: block; margin-bottom: 8px; }
+.resident-appeal-body { margin: 0; white-space: pre-line; }
+.resident-appeal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.resident-secondary-button { padding: 9px 13px; border: 1px solid var(--sky); border-radius: 11px; color: var(--navy); background: var(--card); cursor: pointer; font-weight: 700; }
+.resident-secondary-button:hover { background: var(--sky-2); }
+.resident-unmatched { border-style: dashed; }
+.resident-unmatched p { color: var(--muted); }
+
+@media (max-width: 900px) {
+  .resident-form { grid-template-columns: 1fr 1fr; }
+  .resident-message-field { grid-column: 2; }
+  .resident-submit { grid-column: 1 / -1; }
+  .resident-chips { grid-column: 1 / -1; grid-row: 2; }
+}
+
+@media (max-width: 640px) {
+  .resident-section { padding: 22px; }
+  .resident-heading { flex-direction: column; }
+  .resident-form { grid-template-columns: 1fr; }
+  .resident-message-field, .resident-submit, .resident-chips { grid-column: 1; }
+  .resident-message-field { grid-row: auto; }
+  .resident-chips { grid-row: auto; }
+  .resident-plan-metrics { display: grid; grid-template-columns: 1fr 1fr; }
+  .resident-plan-metrics div { min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resident-status.loading::before { animation: none; }
+}

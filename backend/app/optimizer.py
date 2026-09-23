@@ -100,6 +100,33 @@ def _district_options(measure: dict[str, Any]) -> tuple[int, ...]:
     return tuple(range(len(_DISTRICT_IDS))) if measure["type"] == "district" else (-1,)
 
 
+def _normalise_placements(value: Any) -> dict[str, str | None] | None:
+    """Validate and normalise exact measure placements requested by a caller."""
+    if value is None:
+        return {}
+    if not isinstance(value, list):
+        return None
+
+    placements: dict[str, str | None] = {}
+    for item in value:
+        if not isinstance(item, dict):
+            return None
+        measure_id = item.get("measure_id")
+        district_id = item.get("district_id")
+        if not isinstance(measure_id, str) or measure_id not in MEASURE_BY_ID:
+            return None
+        measure = MEASURE_BY_ID[measure_id]
+        if measure["type"] == "district":
+            if district_id not in _DISTRICT_IDS:
+                return None
+        elif district_id is not None:
+            return None
+        if measure_id in placements and placements[measure_id] != district_id:
+            return None
+        placements[measure_id] = district_id
+    return placements
+
+
 def search_scenarios(
     constraints: dict[str, Any] | None = None,
     objective: str = "max_score",
@@ -108,8 +135,9 @@ def search_scenarios(
     """Return the best valid scenarios matching deterministic constraints.
 
     Supported constraints are ``exclude``, ``require_measures``,
-    ``require_directions`` and ``objective``.  An objective inside constraints
-    is honoured when the explicit argument is left at its default.
+    ``require_directions``, ``require_placements`` and ``objective``.  An
+    objective inside constraints is honoured when the explicit argument is
+    left at its default.
     """
 
     constraints = constraints or {}
@@ -123,6 +151,10 @@ def search_scenarios(
     excluded = _normalise_ids(constraints.get("exclude"))
     required = _normalise_ids(constraints.get("require_measures"))
     required_directions = _normalise_ids(constraints.get("require_directions"))
+    required_placements = _normalise_placements(constraints.get("require_placements"))
+    if required_placements is None:
+        return []
+    required |= set(required_placements)
     known_ids = set(MEASURE_BY_ID)
     known_directions = {measure["direction"] for measure in MEASURES}
     if not required <= known_ids or not required_directions <= known_directions:
@@ -185,7 +217,18 @@ def search_scenarios(
             if all(measure_id in positions for measure_id in synergy["pair"])
         )
 
-        for districts in product(*(_district_options(measure) for measure in measures)):
+        district_options = tuple(
+            (
+                (_DISTRICT_IDS.index(required_placements[measure["id"]]),)
+                if measure["id"] in required_placements
+                and required_placements[measure["id"]] is not None
+                else (-1,)
+                if measure["id"] in required_placements
+                else _district_options(measure)
+            )
+            for measure in measures
+        )
+        for districts in product(*district_options):
             if any(
                 districts[first] == districts[second]
                 for first, second in local_conflicts

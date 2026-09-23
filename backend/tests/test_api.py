@@ -71,3 +71,21 @@ def test_explain_recomputes_and_uses_fallback(monkeypatch):
     assert data["source"] == "deterministic_fallback"
     assert "56.54" in data["summary"]
     assert "999" not in data["summary"]
+
+
+def test_resident_proposal_api_uses_verified_catalog_measure(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/api/resident/propose",
+        json={"district_id": "nura", "message": "Поликлиника в Нуре"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["matched"] is True
+    assert data["measure"]["id"] == "M8"
+    assert data["district"]["id"] == "nura"
+    assert data["evidence"]["measure_effects"][0]["indicator"] == "S2"
+    replay = client.post("/api/simulate", json={"selections": data["plan"]["selections"]})
+    assert replay.json()["score"] == data["plan"]["score"]

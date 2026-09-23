@@ -44,6 +44,18 @@ def test_required_direction_is_present() -> None:
     )
 
 
+def test_required_placement_is_exact_and_valid() -> None:
+    results = search_scenarios(
+        {"require_placements": [{"measure_id": "M8", "district_id": "nura"}]},
+        limit=3,
+    )
+
+    assert results
+    for result in results:
+        assert {"measure_id": "M8", "district_id": "nura"} in result["selections"]
+        assert simulate(result["selections"]).valid
+
+
 def test_results_are_revalidated_by_simulator() -> None:
     results = search_scenarios({"require_measures": ["M4"], "exclude": ["M3"]}, limit=3)
 
