@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .advisor import advise
 from .data import (
@@ -22,6 +22,7 @@ from .data import (
     WEIGHTS,
 )
 from .explainer import explain_result
+from .public_api import SearchRequest, public_search
 from .resident import propose_resident
 from .schemas import SimulationRequest
 from .simulator import BASELINE, simulate
@@ -63,6 +64,11 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/llms.txt", include_in_schema=False)
+def llms_txt() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "llms.txt", media_type="text/plain; charset=utf-8")
 
 
 @app.get("/style.css", include_in_schema=False)
@@ -183,3 +189,16 @@ def resident_proposal_endpoint(request: ResidentRequest):
     if not message:
         raise HTTPException(status_code=400, detail="Опишите предложение жителя")
     return propose_resident(request.district_id, message)
+
+
+@app.post("/api/search")
+def search_endpoint(payload: dict[str, Any]):
+    try:
+        request = SearchRequest.model_validate(payload)
+    except ValidationError as exc:
+        first_error = exc.errors(include_url=False)[0]
+        location = ".".join(str(item) for item in first_error.get("loc", ()))
+        message = first_error.get("msg", "Некорректные параметры поиска")
+        detail = f"{location}: {message}" if location else str(message)
+        raise HTTPException(status_code=400, detail=detail) from exc
+    return public_search(request)
