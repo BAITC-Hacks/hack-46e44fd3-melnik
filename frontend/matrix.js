@@ -3,67 +3,112 @@
 
   const INDICATORS = ['T1', 'T2', 'E1', 'E2', 'S1', 'S2', 'B1', 'B2', 'C1', 'C2'];
   let mode = 'after';
+  let animationKey = '';
+  let animationTimers = [];
 
   const getState = () => (typeof state !== 'undefined' ? state : window.state || {});
   const select = (selector) => document.querySelector(selector);
-
-  function qualityColor(value) {
-    const bounded = Math.max(0, Math.min(100, Number(value)));
-    if (bounded < 40) return `hsl(${4 + bounded * .25} 60% ${84 - bounded * .38}%)`;
-    if (bounded < 70) return `hsl(${38 + (bounded - 40) * .55} 67% ${79 - (bounded - 40) * .2}%)`;
-    return `hsl(${102 + (bounded - 70) * .45} 37% ${72 - (bounded - 70) * .25}%)`;
-  }
+  const theme = () => window.QQTheme;
 
   function deltaColor(value) {
-    const strength = Math.min(1, Math.abs(value) / 10);
-    return value > 0
-      ? `rgba(45, 149, 108, ${.15 + strength * .65})`
-      : value < 0
-        ? `rgba(180, 60, 56, ${.15 + strength * .65})`
-        : '#eef0eb';
+    const colors = theme();
+    const strength = Math.min(1, Math.abs(Number(value)) / 10);
+    if (value > 0) return colors.alpha(colors.colors.high, .16 + strength * .64);
+    if (value < 0) return colors.alpha(colors.colors.low, .16 + strength * .64);
+    return colors.colors.line;
   }
 
-  function cellValue(district, code) {
-    const before = Number(district.indicators_before[code]);
-    const after = Number(district.indicators_after[code]);
-    if (mode === 'before') return before;
-    if (mode === 'delta') return after - before;
-    return after;
+  function clearAnimation() {
+    animationTimers.forEach((timer) => window.clearTimeout(timer));
+    animationTimers = [];
   }
 
-  function render() {
+  function matrixMarkup(districts, names, selectedMode, animate) {
+    const headers = INDICATORS.map((code) =>
+      `<div class="matrix-code" title="${names[code] || code}">${code}</div>`
+    ).join('');
+    let cellIndex = 0;
+    const rows = districts.map((district) => {
+      const cells = INDICATORS.map((code) => {
+        const before = Number(district.indicators_before[code]);
+        const after = Number(district.indicators_after[code]);
+        const value = selectedMode === 'before' ? before : selectedMode === 'delta' ? after - before : after;
+        const display = selectedMode === 'delta'
+          ? `${value > 0 ? '+' : ''}${value.toFixed(1)}`
+          : value.toFixed(1);
+        const target = selectedMode === 'delta' ? deltaColor(value) : theme().scale(value);
+        const background = animate ? theme().scale(before) : target;
+        const title = `${district.name} · ${code} «${names[code] || code}»: ${display}`;
+        const critical = selectedMode !== 'delta' && value < 40 ? ' matrix-cell-critical' : '';
+        const animation = animate ? ` data-matrix-target="${target}" data-matrix-order="${cellIndex++}"` : '';
+        return `<div class="matrix-cell${critical}" style="background:${background}"${animation} title="${title}" aria-label="${title}">${display}</div>`;
+      }).join('');
+      return `<div class="matrix-row-label">${district.name}</div>${cells}`;
+    }).join('');
+    return `<div class="matrix-grid"><div></div>${headers}${rows}</div>`;
+  }
+
+  function resultDistricts(result) {
+    return result.districts.map((district) => ({
+      name: district.name,
+      indicators_before: district.indicators_before,
+      indicators_after: district.indicators_after,
+    }));
+  }
+
+  function baselineDistricts(catalog) {
+    return (catalog.districts || []).map((district) => ({
+      name: district.name,
+      indicators_before: district.indicators,
+      indicators_after: district.indicators,
+    }));
+  }
+
+  function renderBaseline() {
+    const catalog = getState().catalog;
+    const container = select('#baseline-matrix');
+    if (!container || !catalog?.districts) return;
+    container.innerHTML = matrixMarkup(
+      baselineDistricts(catalog),
+      catalog.indicator_names || {},
+      'after',
+      false,
+    );
+  }
+
+  function renderResult() {
     const currentState = getState();
     const result = currentState.result;
     const container = select('#indicator-matrix');
     if (!container || !result?.valid || !Array.isArray(result.districts)) return;
-
-    const names = currentState.catalog?.indicator_names || {};
-    const headers = INDICATORS.map((code) =>
-      `<div class="matrix-code" title="${names[code] || code}">${code}</div>`
-    ).join('');
-    const rows = result.districts.map((district) => {
-      const cells = INDICATORS.map((code) => {
-        const value = cellValue(district, code);
-        const display = mode === 'delta'
-          ? `${value > 0 ? '+' : ''}${value.toFixed(1)}`
-          : value.toFixed(1);
-        const background = mode === 'delta' ? deltaColor(value) : qualityColor(value);
-        const title = `${district.name} · ${code} «${names[code] || code}»: ${display}`;
-        return `<div class="matrix-cell" style="background:${background}" title="${title}" aria-label="${title}">${display}</div>`;
-      }).join('');
-      return `<div class="matrix-row-label">${district.name}</div>${cells}`;
-    }).join('');
-
-    container.innerHTML = `<div class="matrix-grid"><div></div>${headers}${rows}</div>`;
-    select('#matrix-legend').textContent = mode === 'delta'
-      ? 'Δ показывает изменение: зелёный — рост, красный — снижение.'
-      : 'Единая шкала: красный < 40, жёлтый 40–69, зелёный ≥ 70.';
+    const key = JSON.stringify(result.selections || []);
+    const animate = mode === 'after' && key !== animationKey && !theme().reducedMotion();
+    if (animate) animationKey = key;
+    clearAnimation();
+    container.innerHTML = matrixMarkup(
+      resultDistricts(result),
+      currentState.catalog?.indicator_names || {},
+      mode,
+      animate,
+    );
+    const legend = select('#matrix-legend');
+    if (legend) {
+      legend.textContent = mode === 'delta'
+        ? 'Δ показывает изменение: зелёный — рост, красный — снижение.'
+        : 'Визуальная шкала: красный < 45, янтарный 45–65, зелёный > 65. Критический порог расчёта — ниже 40.';
+    }
+    if (animate) {
+      container.querySelectorAll('[data-matrix-target]').forEach((cell) => {
+        const timer = window.setTimeout(() => {
+          cell.style.background = cell.dataset.matrixTarget;
+        }, Number(cell.dataset.matrixOrder) * 40);
+        animationTimers.push(timer);
+      });
+    }
   }
 
   function mount() {
     const resultScreen = select('#result-screen');
-    if (!resultScreen || !select('#indicator-matrix')) return;
-
     document.querySelectorAll('[data-matrix-mode]').forEach((button) => {
       button.addEventListener('click', () => {
         mode = button.dataset.matrixMode;
@@ -72,14 +117,17 @@
           item.classList.toggle('active', active);
           item.setAttribute('aria-pressed', String(active));
         });
-        render();
+        renderResult();
       });
     });
-
-    new MutationObserver(() => {
-      if (!resultScreen.classList.contains('hidden')) render();
-    }).observe(resultScreen, { attributes: true, attributeFilter: ['class'] });
-    if (!resultScreen.classList.contains('hidden')) render();
+    if (resultScreen) {
+      new MutationObserver(() => {
+        if (!resultScreen.classList.contains('hidden')) renderResult();
+      }).observe(resultScreen, { attributes: true, attributeFilter: ['class'] });
+      if (!resultScreen.classList.contains('hidden')) renderResult();
+    }
+    renderBaseline();
+    window.addEventListener('qq:catalog-ready', renderBaseline);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });

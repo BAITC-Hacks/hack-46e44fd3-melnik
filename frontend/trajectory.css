@@ -1,27 +1,24 @@
 .strategy-dashboard { padding: 30px; border: 1px solid var(--line); border-radius: 26px; background: var(--card); box-shadow: var(--shadow); }
-.trajectory-chart-card { position: relative; height: 350px; padding: 20px; border: 1px solid var(--line); border-radius: 19px; background: #fff; }
+.trajectory-chart-card { position: relative; height: 350px; padding: 20px; border: 1px solid var(--line); border-radius: 19px; background: var(--card); }
 .trajectory-loading, .comparison-placeholder { height: 100%; display: grid; place-items: center; color: var(--muted); text-align: center; }
-.trajectory-loading.error, .comparison-placeholder.error { color: var(--red); }
+.trajectory-loading.error, .comparison-placeholder.error { color: var(--navy); font-weight: 700; }
 .comparison-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin: 48px 0 20px; }
 .comparison-heading h2 { margin: 0; }
 .comparison-heading > p { max-width: 470px; margin: 0; color: var(--muted); }
 .scenario-comparison { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .scenario-comparison > .comparison-placeholder { grid-column: 1 / -1; min-height: 180px; border: 1px dashed var(--line); border-radius: 18px; }
-.policy-card { position: relative; min-height: 260px; padding: 20px; overflow: hidden; border: 1px solid var(--line); border-radius: 19px; background: #f7f6f0; }
-.policy-card.blind { color: white; border-color: var(--green); background: var(--green); }
-.policy-card.balanced { border-color: #b8cda4; background: #e5edda; }
+.policy-card { position: relative; min-height: 260px; padding: 20px; overflow: hidden; border: 1px solid var(--line); border-radius: 19px; background: var(--paper); }
+.policy-card.blind { color: var(--card); border-color: var(--navy); background: var(--navy); }
+.policy-card.balanced { border-color: var(--sky); background: var(--sky-2); }
 .policy-label { font-size: 12px; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
 .policy-card p { min-height: 42px; margin: 8px 0 16px; color: var(--muted); }
-.policy-card.blind p, .policy-card.blind small { color: rgba(255,255,255,.7); }
+.policy-card.blind p, .policy-card.blind small { color: color-mix(in srgb, var(--card) 70%, transparent); }
 .policy-score { display: flex; align-items: end; gap: 8px; }
-.policy-score strong { font-size: 48px; line-height: 1; letter-spacing: -.05em; }
+.policy-score strong { font-family: var(--font-heading); font-size: 44px; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.policy-card.blind .policy-score strong { color: var(--gold); }
 .policy-score span { margin-bottom: 4px; font-size: 11px; text-transform: uppercase; }
-.policy-cost { margin-top: 8px; font-weight: 750; }
+.policy-cost { margin-top: 8px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .policy-measures { margin: 18px 0 12px; font-size: 13px; font-weight: 750; }
 .policy-card small { display: block; color: var(--muted); }
 @media (max-width: 900px) { .scenario-comparison { grid-template-columns: 1fr; } }
-@media (max-width: 640px) {
-  .strategy-dashboard { padding: 21px; }
-  .trajectory-chart-card { height: 300px; padding: 10px; }
-  .comparison-heading { align-items: flex-start; flex-direction: column; }
-}
+@media (max-width: 640px) { .strategy-dashboard { padding: 21px; } .trajectory-chart-card { height: 300px; padding: 10px; } .comparison-heading { align-items: flex-start; flex-direction: column; } }

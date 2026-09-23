@@ -5,12 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="AI-симулятор управленческих решений для Астаны">
   <title>QalaQadam — Аким на 5 часов</title>
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./advisor.css">
-  <link rel="stylesheet" href="./trajectory.css">
-  <link rel="stylesheet" href="./insights.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
-  <script src="./app.js" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Unbounded:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/advisor.css">
+  <link rel="stylesheet" href="/static/trajectory.css">
+  <link rel="stylesheet" href="/static/insights.css">
+  <script src="/static/vendor/chart.umd.min.js" defer></script>
+  <script src="/static/theme.js" defer></script>
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -22,24 +26,47 @@
   </header>
 
   <main>
-    <section id="selection-screen" class="screen">
+    <section id="welcome-screen" class="screen welcome-screen">
+      <p id="welcome-meta" class="eyebrow">Загружаем параметры города…</p>
+      <div class="welcome-layout">
+        <div class="welcome-city">
+          <h1>Городу можно помочь стать лучше</h1>
+          <p class="hero-copy">Посмотрите, где поддержка нужна сильнее всего, и соберите понятный план изменений.</p>
+          <div class="welcome-matrix-card">
+            <div class="welcome-matrix-heading">
+              <strong>Состояние районов сегодня</strong>
+              <span>Районы и показатели</span>
+            </div>
+            <div class="matrix-scroll"><div id="baseline-matrix"></div></div>
+            <p id="baseline-weakness" class="baseline-weakness">Ищем точку, где помощь нужнее всего…</p>
+          </div>
+        </div>
+        <aside class="welcome-score-card">
+          <span>Стартовый Score</span>
+          <strong id="welcome-score">—</strong>
+          <small id="welcome-critical">Загружаем данные…</small>
+          <button id="start-button" class="primary-button" type="button">Начать</button>
+        </aside>
+      </div>
+    </section>
+
+    <section id="selection-screen" class="screen hidden">
       <div class="hero">
         <div>
-          <p class="eyebrow">У вас 100 единиц и 8 кварталов</p>
-          <h1>Примите пять решений,<br>которые изменят город</h1>
+          <p id="selection-meta" class="eyebrow">Бюджет и горизонт загружаются…</p>
+          <h1>Выберите шаги,<br>которые помогут городу</h1>
           <p class="hero-copy">Выберите мероприятия, укажите районы и найдите баланс между общим ростом и поддержкой самого слабого района.</p>
         </div>
-        <div class="baseline-card">
+        <div class="selection-score-card">
           <span>Стартовый Score</span>
-          <strong id="baseline-score">52.56</strong>
-          <small>2 критических показателя</small>
+          <strong id="baseline-score">—</strong>
         </div>
       </div>
 
       <div class="sticky-panel">
-        <div class="counter"><span>Бюджет</span><strong><b id="budget-used">0</b> / 100</strong></div>
-        <div class="counter"><span>Решения</span><strong><b id="decision-count">0</b> / 5</strong></div>
-        <div class="counter"><span>Направления</span><strong><b id="direction-count">0</b> / 5</strong></div>
+        <div class="counter"><span>Бюджет</span><strong><b id="budget-used">—</b> / <i id="budget-total">—</i></strong></div>
+        <div class="counter"><span>Решения</span><strong><b id="decision-count">—</b> / <i id="decision-total">—</i></strong></div>
+        <div class="counter"><span>Направления</span><strong><b id="direction-count">—</b> / <i id="direction-total">—</i></strong></div>
         <div class="budget-track"><i id="budget-bar"></i></div>
         <button id="calculate-button" class="primary-button" disabled>Рассчитать сценарий</button>
       </div>
@@ -72,7 +99,7 @@
       <section class="result-section">
         <div class="section-heading">
           <div><p class="eyebrow">Результат по территории</p><h2>Районы: до и после</h2></div>
-          <p>Score района учитывает все 10 показателей с весами из брифа.</p>
+          <p>Score района учитывает все показатели с весами из брифа.</p>
         </div>
         <div class="chart-card"><canvas id="district-chart"></canvas></div>
         <div id="district-results" class="district-grid"></div>
@@ -81,7 +108,7 @@
       <section class="result-section indicator-views">
         <div class="section-heading">
           <div><p class="eyebrow">Профиль города</p><h2>Матрица показателей</h2></div>
-          <p>Пять районов × десять показателей на единой шкале. Наведите на ячейку для точного значения.</p>
+          <p>Все районы и показатели на единой шкале. Наведите на ячейку для точного значения.</p>
         </div>
         <div class="matrix-toolbar">
           <div class="matrix-toggle" role="group" aria-label="Режим матрицы">
@@ -89,14 +116,14 @@
             <button type="button" data-matrix-mode="after" class="active" aria-pressed="true">После</button>
             <button type="button" data-matrix-mode="delta" aria-pressed="false">Δ</button>
           </div>
-          <p id="matrix-legend" class="matrix-legend">Единая шкала: красный &lt; 40, жёлтый 40–69, зелёный ≥ 70.</p>
+          <p id="matrix-legend" class="matrix-legend">Визуальная шкала: красный &lt; 45, янтарный 45–65, зелёный &gt; 65. Критический порог расчёта — ниже 40.</p>
         </div>
         <div class="matrix-scroll"><div id="indicator-matrix"></div></div>
       </section>
 
       <section class="result-section indicator-views">
         <div class="section-heading">
-          <div><p class="eyebrow">Диагностика района</p><h2>До и после по 10 осям</h2></div>
+          <div><p class="eyebrow">Район крупным планом</p><h2>До и после по всем показателям</h2></div>
           <div class="radar-controls">
             <label for="district-radar-select">Район</label>
             <select id="district-radar-select"></select>
@@ -126,9 +153,9 @@
   </main>
 
   <footer>QalaQadam · HackAlem AI 2026 · Числа считает код, LLM только объясняет результат</footer>
-  <script src="./advisor.js" defer></script>
-  <script src="./trajectory.js" defer></script>
-  <script src="./matrix.js" defer></script>
-  <script src="./radar.js" defer></script>
+  <script src="/static/advisor.js" defer></script>
+  <script src="/static/trajectory.js" defer></script>
+  <script src="/static/matrix.js" defer></script>
+  <script src="/static/radar.js" defer></script>
 </body>
 </html>

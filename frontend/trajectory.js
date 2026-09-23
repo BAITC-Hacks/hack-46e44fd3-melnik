@@ -11,6 +11,7 @@
   };
   const appState = () => (typeof state !== 'undefined' ? state : window.state || {});
   const format = (value, digits = 2) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
+  const theme = () => window.QQTheme;
   let trajectoryChart = null;
   let lastScenarioKey = '';
 
@@ -25,9 +26,9 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Динамика реализации</p>
-          <h2>Что изменится за 8 кварталов</h2>
+          <h2 id="trajectory-title">Что изменится со временем</h2>
         </div>
-        <p>Score растёт по мере реализации мер. Индекс городской справедливости — разрыв между лучшим и слабейшим районами: меньше значит справедливее.</p>
+        <p>Score меняется по мере реализации мер. Индекс городской справедливости — разрыв между лучшим и слабейшим районами: меньше значит справедливее.</p>
       </div>
       <div class="trajectory-chart-card">
         <div id="trajectory-loading" class="trajectory-loading">Строим поквартальную траекторию…</div>
@@ -45,11 +46,23 @@
     if (advisor) advisor.before(section);
     else resultScreen.appendChild(section);
 
+    updateHorizonCopy();
+    window.addEventListener('qq:catalog-ready', updateHorizonCopy);
+
     const observer = new MutationObserver(() => {
       if (!resultScreen.classList.contains('hidden')) refresh();
     });
     observer.observe(resultScreen, { attributes: true, attributeFilter: ['class'] });
     if (!resultScreen.classList.contains('hidden')) refresh();
+  }
+
+  function updateHorizonCopy() {
+    const catalog = appState().catalog;
+    const title = select('#trajectory-title');
+    if (!title || !catalog?.horizon) return;
+    const years = catalog.horizon / 4;
+    const display = Number.isInteger(years) ? years : years.toFixed(1);
+    title.textContent = `Что изменится за ${display} года`;
   }
 
   async function post(path, payload) {
@@ -119,11 +132,11 @@
             label: 'Astana Quality of Life Score',
             data: points.map((item) => item.score),
             yAxisID: 'score',
-            borderColor: '#146b4a',
-            backgroundColor: 'rgba(20,107,74,.12)',
+            borderColor: theme().colors.after,
+            backgroundColor: theme().alpha(theme().colors.after, .12),
             borderWidth: 3,
             pointRadius: 4,
-            pointBackgroundColor: '#146b4a',
+            pointBackgroundColor: theme().colors.after,
             tension: .28,
             fill: true,
           },
@@ -131,7 +144,7 @@
             label: 'Индекс городской справедливости · меньше лучше',
             data: points.map((item) => item.balance),
             yAxisID: 'balance',
-            borderColor: '#a96f13',
+            borderColor: theme().colors.navy,
             borderDash: [7, 5],
             borderWidth: 2,
             pointRadius: 3,
@@ -145,7 +158,7 @@
         interaction: { mode: 'index', intersect: false },
         plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 22 } } },
         scales: {
-          score: { type: 'linear', position: 'left', suggestedMin: 48, suggestedMax: 60, title: { display: true, text: 'Score' }, grid: { color: '#e7e8e2' } },
+          score: { type: 'linear', position: 'left', suggestedMin: 48, suggestedMax: 60, title: { display: true, text: 'Score' }, grid: { color: theme().colors.line } },
           balance: { type: 'linear', position: 'right', suggestedMin: 0, title: { display: true, text: 'Разрыв между районами' }, grid: { drawOnChartArea: false } },
           x: { grid: { display: false }, title: { display: true, text: 'Квартал' } },
         },
@@ -163,11 +176,12 @@
   }
 
   function policyCard(kind, title, subtitle, score, cost, measures, note) {
+    const budget = appState().catalog?.budget;
     return `<article class="policy-card ${kind}">
       <div class="policy-label">${title}</div>
       <p>${subtitle}</p>
       <div class="policy-score"><strong>${format(score)}</strong><span>Score</span></div>
-      <div class="policy-cost">${format(cost, 0)} / 100 ед.</div>
+      <div class="policy-cost">${format(cost, 0)} / ${format(budget, 0)} ед.</div>
       <div class="policy-measures">${measures || '—'}</div>
       <small>${note}</small>
     </article>`;

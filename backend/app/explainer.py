@@ -9,16 +9,15 @@ from pydantic import BaseModel
 from .data import DISTRICT_BY_ID, INDICATOR_NAMES, MEASURE_BY_ID
 from .schemas import Explanation, SimulationResult
 
-SYSTEM_PROMPT = """Ты — аналитик городских сценариев. Используй медицинскую
-метафору только как ясную структуру речи, а не как медицинское утверждение:
-summary — «диагноз» состояния города и стратегии, strengths — сработавшая
-«терапия», risks — оставшиеся «симптомы», tradeoffs — «прогноз» и цена выбранных
-приоритетов. Ты получаешь готовые, уже посчитанные кодом цифры. Не пересчитывай
-и не придумывай числа, не меняй Score. Объясняй только то, что явно есть в JSON:
-какие районы выиграли или не изменились, какие показатели остались критическими,
-какие направления и районы получили инвестиции и какой компромисс сделала
-команда. Не утверждай причинно-следственные связи сверх данных. Пиши кратко и
-понятно по-русски."""
+SYSTEM_PROMPT = """Ты — дружелюбный аналитик городских сценариев. Объясняй
+результат простыми словами: в summary — что получилось, в strengths — что стало
+лучше, в risks — где ещё стоит подтянуть показатели, в tradeoffs — чем пришлось
+пожертвовать ради выбранных приоритетов. Ты получаешь готовые, уже посчитанные
+кодом цифры. Не пересчитывай и не придумывай числа, не меняй Score. Объясняй
+только то, что явно есть в JSON: какие районы выиграли или не изменились, какие
+показатели остались критическими, какие направления и районы получили инвестиции
+и какой компромисс сделала команда. Не утверждай причинно-следственные связи
+сверх данных. Пиши кратко и понятно по-русски."""
 
 
 class _LLMExplanation(BaseModel):
@@ -78,29 +77,37 @@ def _fallback(result: SimulationResult) -> Explanation:
     )
     leaders = [item for item in improved if item["D_after"] > item["D_before"]][:2]
     strengths = [
-        f"{item['name']}: районная оценка выросла с {item['D_before']:.2f} до {item['D_after']:.2f}."
+        f"Стало лучше в районе {item['name']}: оценка выросла "
+        f"с {item['D_before']:.2f} до {item['D_after']:.2f}."
         for item in leaders
-    ] or ["Сценарий не улучшил оценки районов."]
+    ] or ["Пока оценки районов не улучшились."]
 
     if result.critical_cells_after:
         risks = [
-            f"{DISTRICT_BY_ID[cell['district_id']]['name']}: показатель {cell['indicator']} "
-            f"«{INDICATOR_NAMES[cell['indicator']]}» остался ниже 40."
+            f"Ещё стоит подтянуть район {DISTRICT_BY_ID[cell['district_id']]['name']}: "
+            f"показатель {cell['indicator']} «{INDICATOR_NAMES[cell['indicator']]}» "
+            "остался ниже 40."
             for cell in result.critical_cells_after
         ]
     else:
-        risks = ["После реализации сценария критических показателей ниже 40 не осталось."]
+        risks = ["Подтягивать критические показатели больше не нужно: значений ниже 40 не осталось."]
 
     district_spend = [item for item in result.selections if item["district_id"]]
     covered = sorted({DISTRICT_BY_ID[item["district_id"]]["name"] for item in district_spend})
     directions = sorted({MEASURE_BY_ID[item["measure_id"]]["direction"] for item in result.selections})
     tradeoffs = [
-        f"Районные меры сосредоточены в: {', '.join(covered) if covered else 'нет районных мер'}.",
-        f"Сценарий охватывает {len(directions)} из 5 направлений: {', '.join(directions)}.",
+        (
+            "Цена выбранного фокуса: районные меры сосредоточены в: "
+            f"{', '.join(covered) if covered else 'нет районных мер'}."
+        ),
+        (
+            f"Ради приоритетов сценарий охватывает {len(directions)} из 5 направлений: "
+            f"{', '.join(directions)}."
+        ),
     ]
     return Explanation(
         summary=(
-            f"Astana Quality of Life Score изменился с {result.score_base:.2f} "
+            f"Получилось изменить Astana Quality of Life Score с {result.score_base:.2f} "
             f"до {result.score:.2f}; бюджет сценария — {result.cost_total} из 100."
         ),
         strengths=strengths,

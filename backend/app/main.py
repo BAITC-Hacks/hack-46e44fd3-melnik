@@ -125,6 +125,8 @@ def catalog() -> dict[str, Any]:
             "city_avg": BASELINE["city_avg"],
             "min_district": BASELINE["min_district"],
             "n_crit": BASELINE["n_crit"],
+            "district_scores": BASELINE["district_scores"],
+            "critical_cells": BASELINE["critical_cells"],
         },
     }
 

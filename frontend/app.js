@@ -1,4 +1,4 @@
-const state = { catalog: null, selected: new Map(), result: null, chart: null };
+const state = { catalog: null, selected: new Map(), result: null, chart: null, scoreAnimation: null };
 const $ = (selector) => document.querySelector(selector);
 const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
 const api = (path) => `${API_BASE}${path}`;
@@ -8,9 +8,79 @@ async function init() {
   if (!response.ok) throw new Error('Не удалось загрузить каталог');
   state.catalog = await response.json();
   $('#baseline-score').textContent = state.catalog.baseline.score.toFixed(2);
+  const welcomeScore = $('#welcome-score');
+  if (welcomeScore) welcomeScore.textContent = state.catalog.baseline.score.toFixed(2);
+  const welcomeCritical = $('#welcome-critical');
+  if (welcomeCritical) {
+    welcomeCritical.textContent = `${state.catalog.baseline.n_crit} показателя требуют внимания`;
+  }
+  renderCatalogMeta();
+  renderBaselineInsight();
   renderCatalog();
   bindControls();
   updateValidation();
+  window.dispatchEvent(new CustomEvent('qq:catalog-ready', { detail: state.catalog }));
+}
+
+function theme() {
+  return window.QQTheme || {
+    colors: { before: 'gray', after: 'currentColor', line: 'gray', muted: 'gray' },
+    scale: () => 'currentColor',
+    direction: () => 'currentColor',
+    reducedMotion: () => true,
+  };
+}
+
+function directionKey(direction) {
+  return ({
+    'Транспорт': 'transport',
+    'Экология': 'ecology',
+    'Соцсфера': 'social',
+    'Безопасность': 'safety',
+    'Сервисы': 'services',
+  })[direction] || 'other';
+}
+
+function renderBaselineInsight() {
+  const target = $('#baseline-weakness');
+  const baseline = state.catalog?.baseline;
+  if (!target || !baseline?.district_scores || !Array.isArray(baseline.critical_cells)) return;
+  const entries = Object.entries(baseline.district_scores);
+  if (!entries.length) return;
+  const weakestId = baseline.min_district || entries.sort((a, b) => a[1] - b[1])[0][0];
+  const district = state.catalog.districts.find((item) => item.id === weakestId);
+  if (!district) return;
+  const critical = baseline.critical_cells
+    .filter((item) => item.district_id === weakestId)
+    .map((item) => {
+      const code = item.indicator;
+      const value = district.indicators?.[code];
+      return value == null ? null : `${state.catalog.indicator_names?.[code] || code} — ${value}`;
+    })
+    .filter(Boolean);
+  target.textContent = critical.length
+    ? `${district.name} ждёт помощи: ${critical.join(', ')}.`
+    : `${district.name} — район с самым низким стартовым баллом.`;
+}
+
+function renderCatalogMeta() {
+  const directions = new Set(state.catalog.measures.map((item) => item.direction)).size;
+  const years = state.catalog.horizon / 4;
+  const yearText = Number.isInteger(years) ? years : years.toFixed(1);
+  const meta = `${state.catalog.budget} единиц бюджета · ${state.catalog.decisions_required} решений · горизонт ${yearText} года (${state.catalog.horizon} кварталов)`;
+  ['#welcome-meta', '#selection-meta'].forEach((selector) => {
+    const node = $(selector);
+    if (node) node.textContent = meta;
+  });
+  const values = {
+    '#budget-total': state.catalog.budget,
+    '#decision-total': state.catalog.decisions_required,
+    '#direction-total': directions,
+  };
+  Object.entries(values).forEach(([selector, value]) => {
+    const node = $(selector);
+    if (node) node.textContent = value;
+  });
 }
 
 function bindControls() {
@@ -18,6 +88,8 @@ function bindControls() {
   $('#back-button').addEventListener('click', () => showScreen('selection'));
   $('#reset-selection').addEventListener('click', () => { state.selected.clear(); renderCatalog(); updateValidation(); });
   $('#load-example').addEventListener('click', loadExample);
+  const start = $('#start-button');
+  if (start) start.addEventListener('click', () => showScreen('selection'));
 }
 
 function groupBy(items, key) {
@@ -35,7 +107,7 @@ function effectText(measure) {
 function renderCatalog() {
   const groups = groupBy(state.catalog.measures, 'direction');
   $('#catalog').innerHTML = Object.entries(groups).map(([direction, measures]) => `
-    <section class="direction-group">
+    <section class="direction-group dir-${directionKey(direction)}" style="--direction:${theme().direction(direction)}">
       <h2>${direction} <span>${measures.length} мероприятия</span></h2>
       <div class="measure-grid">
         ${measures.map(measureCard).join('')}
@@ -63,7 +135,7 @@ function measureCard(measure) {
   const selected = state.selected.has(measure.id);
   const district = state.selected.get(measure.id);
   const options = state.catalog.districts.map(item => `<option value="${item.id}" ${district === item.id ? 'selected' : ''}>${item.name}</option>`).join('');
-  return `<article class="measure-card ${selected ? 'selected' : ''}" data-id="${measure.id}">
+  return `<article class="measure-card dir-${directionKey(measure.direction)} ${selected ? 'selected' : ''}" data-id="${measure.id}" data-direction="${measure.direction}">
     <input type="checkbox" ${selected ? 'checked' : ''} tabindex="-1">
     <div class="measure-top"><span class="measure-id">${measure.id}</span><span class="measure-cost">${measure.cost} ед.</span></div>
     <h3>${measure.name}</h3>
@@ -83,16 +155,16 @@ function selections() {
 
 function validateClient() {
   const chosen = selections();
-  if (chosen.length !== 5) return `Нужно выбрать ровно 5 решений: сейчас ${chosen.length}`;
+  if (chosen.length !== state.catalog.decisions_required) return `Нужно выбрать ровно ${state.catalog.decisions_required} решений: сейчас ${chosen.length}`;
   const lookup = Object.fromEntries(state.catalog.measures.map(item => [item.id, item]));
   const cost = chosen.reduce((sum, item) => sum + lookup[item.measure_id].cost, 0);
-  if (cost > 100) return `Превышен бюджет: ${cost} > 100`;
+  if (cost > state.catalog.budget) return `Превышен бюджет: ${cost} > ${state.catalog.budget}`;
   const missing = chosen.find(item => lookup[item.measure_id].type === 'district' && !item.district_id);
   if (missing) return `Выберите район для ${missing.measure_id}`;
   const counts = {};
   chosen.forEach(item => counts[lookup[item.measure_id].direction] = (counts[lookup[item.measure_id].direction] || 0) + 1);
-  const overloaded = Object.entries(counts).find(([, count]) => count > 2);
-  if (overloaded) return `В направлении «${overloaded[0]}» выбрано больше 2 мер`;
+  const overloaded = Object.entries(counts).find(([, count]) => count > state.catalog.max_per_direction);
+  if (overloaded) return `В направлении «${overloaded[0]}» выбрано больше ${state.catalog.max_per_direction} мер`;
   const byId = Object.fromEntries(chosen.map(item => [item.measure_id, item]));
   if (byId.M1 && byId.M3) return 'M1 и M3 несовместимы в любых районах';
   for (const [a, b] of [['M4','M7'], ['M5','M13']]) {
@@ -109,8 +181,8 @@ function updateValidation() {
   $('#budget-used').textContent = cost;
   $('#decision-count').textContent = chosen.length;
   $('#direction-count').textContent = directions.size;
-  $('#budget-bar').style.width = `${Math.min(cost, 100)}%`;
-  $('#budget-bar').style.background = cost > 100 ? 'var(--red)' : 'var(--green-2)';
+  $('#budget-bar').style.width = `${Math.min(cost / state.catalog.budget * 100, 100)}%`;
+  $('#budget-bar').style.background = cost > state.catalog.budget ? 'var(--data-low)' : 'var(--sky)';
   const error = validateClient();
   const message = $('#validation-message');
   message.textContent = error || 'Сценарий готов к расчёту';
@@ -148,6 +220,7 @@ async function calculate() {
 }
 
 function showScreen(name) {
+  $('#welcome-screen').classList.toggle('hidden', name !== 'welcome');
   $('#selection-screen').classList.toggle('hidden', name !== 'selection');
   $('#result-screen').classList.toggle('hidden', name !== 'result');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -155,9 +228,9 @@ function showScreen(name) {
 
 function renderResult() {
   const r = state.result;
-  $('#result-score').textContent = r.score.toFixed(2);
+  animateScore(r.score_base, r.score);
   $('#result-delta').textContent = `${r.delta >= 0 ? '+' : ''}${r.delta.toFixed(2)}`;
-  $('#score-caption').textContent = `Базовый уровень ${r.score_base.toFixed(2)}. Использовано ${r.cost_total} из 100 единиц бюджета.`;
+  $('#score-caption').textContent = `Базовый уровень ${r.score_base.toFixed(2)}. Использовано ${r.cost_total} из ${state.catalog.budget} единиц бюджета.`;
   const districtName = id => state.catalog.districts.find(item => item.id === id).name;
   $('#summary-metrics').innerHTML = `
     <div class="metric"><span>Средний городской балл</span><strong>${r.city_avg_before.toFixed(2)} → ${r.city_avg_after.toFixed(2)}</strong></div>
@@ -169,11 +242,34 @@ function renderResult() {
   renderContributions(r);
 }
 
+function animateScore(from, to) {
+  const target = $('#result-score');
+  if (!target) return;
+  if (state.scoreAnimation) cancelAnimationFrame(state.scoreAnimation);
+  if (theme().reducedMotion()) {
+    target.textContent = Number(to).toFixed(2);
+    return;
+  }
+  const startValue = Number(from);
+  const endValue = Number(to);
+  const duration = 1200;
+  let startedAt = null;
+  const tick = (timestamp) => {
+    startedAt ??= timestamp;
+    const progress = Math.min(1, (timestamp - startedAt) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    target.textContent = (startValue + (endValue - startValue) * eased).toFixed(2);
+    if (progress < 1) state.scoreAnimation = requestAnimationFrame(tick);
+    else state.scoreAnimation = null;
+  };
+  state.scoreAnimation = requestAnimationFrame(tick);
+}
+
 function renderChart(result) {
   if (state.chart) state.chart.destroy();
   const context = $('#district-chart');
   if (typeof Chart === 'undefined') {
-    context.parentElement.innerHTML = '<p class="validation-message">График недоступен без CDN, числовые карточки районов ниже продолжают работать.</p>';
+    context.parentElement.innerHTML = '<p class="validation-message">График временно недоступен, числовые карточки районов ниже продолжают работать.</p>';
     return;
   }
   state.chart = new Chart(context, {
@@ -181,20 +277,22 @@ function renderChart(result) {
     data: {
       labels: result.districts.map(item => item.name),
       datasets: [
-        { label: 'До', data: result.districts.map(item => item.D_before), backgroundColor: '#bfc7bf', borderRadius: 7 },
-        { label: 'После', data: result.districts.map(item => item.D_after), backgroundColor: '#2d956c', borderRadius: 7 },
+        { label: 'До', data: result.districts.map(item => item.D_before), backgroundColor: theme().colors.before, borderRadius: 7 },
+        { label: 'После', data: result.districts.map(item => item.D_after), backgroundColor: theme().colors.after, borderRadius: 7 },
       ]
     },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100, grid: { color: '#e7e8e2' } } }, plugins: { legend: { position: 'bottom' } } }
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100, grid: { color: theme().colors.line } } }, plugins: { legend: { position: 'bottom' } } }
   });
 }
 
 function districtCard(item) {
   const rows = Object.keys(item.indicators_before).map(code => {
     const before = item.indicators_before[code], after = item.indicators_after[code], critical = after < 40;
+    const changeStart = Math.min(before, after);
+    const changeWidth = Math.abs(after - before);
     return `<div class="indicator-row ${critical ? 'critical' : ''}" title="${state.catalog.indicator_names[code]}">
       <span class="indicator-code">${code}</span>
-      <span class="mini-track"><i class="mini-before" style="width:${before}%"></i><i class="mini-after" style="width:${after}%"></i></span>
+      <span class="mini-track" title="Было ${before.toFixed(1)}, стало ${after.toFixed(1)}"><i class="mini-before" style="width:${before}%"></i><i class="mini-after" style="left:${changeStart}%;width:${changeWidth}%;background:${theme().scale(after)}"></i></span>
       <span class="indicator-values">${before.toFixed(1)} → ${after.toFixed(1)}</span>
     </div>`;
   }).join('');
@@ -215,7 +313,7 @@ async function loadExplanation(result) {
     const data = await response.json();
     $('#explanation-source').textContent = data.source === 'openai' ? 'OpenAI' : 'резервный анализ';
     $('#analysis-content').innerHTML = `<p class="analysis-summary">${escapeHtml(data.summary)}</p><div class="analysis-columns">
-      ${analysisColumn('Сильные стороны', data.strengths)}${analysisColumn('Риски', data.risks)}${analysisColumn('Компромиссы', data.tradeoffs)}
+      ${analysisColumn('Что стало лучше', data.strengths)}${analysisColumn('Где ещё можно подтянуть', data.risks)}${analysisColumn('Чем пришлось пожертвовать', data.tradeoffs)}
     </div>`;
   } catch (error) {
     $('#analysis-content').innerHTML = `<p>${escapeHtml(error.message)}</p>`;
@@ -234,8 +332,9 @@ function renderContributions(result) {
   const measures = Object.fromEntries(state.catalog.measures.map(item => [item.id, item]));
   const districts = Object.fromEntries(state.catalog.districts.map(item => [item.id, item.name]));
   const normal = result.measure_contributions.map(item => {
+    const measure = measures[item.measure_id];
     const effects = Object.entries(item.realized_effects).map(([code, value]) => `${code} ${value >= 0 ? '+' : ''}${value.toFixed(2)}`).join(' · ');
-    return `<div class="contribution"><div><strong>${item.measure_id} · ${measures[item.measure_id].name}</strong><small>${item.district_id ? districts[item.district_id] : 'Весь город'} · реализовано ${(item.realized_fraction * 100).toFixed(0)}%</small></div><b>${effects}</b></div>`;
+    return `<div class="contribution dir-${directionKey(measure.direction)}" data-direction="${measure.direction}" style="--direction-color:${theme().direction(measure.direction)}"><div><strong>${item.measure_id} · ${measure.name}</strong><small>${item.district_id ? districts[item.district_id] : 'Весь город'} · реализовано ${(item.realized_fraction * 100).toFixed(0)}%</small></div><b>${effects}</b></div>`;
   });
   const synergies = result.synergies_applied.map(item => `<div class="contribution synergy"><div><strong>Синергия ${item.pair.join(' + ')}</strong><small>${districts[item.district_id]} · без масштабирования лагом</small></div><b>${Object.entries(item.bonus).map(([k,v]) => `${k} +${v}`).join(' · ')}</b></div>`);
   $('#contributions').innerHTML = [...normal, ...synergies].join('');

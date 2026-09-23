@@ -7,6 +7,7 @@
 
   const getState = () => (typeof state !== 'undefined' ? state : window.state || {});
   const select = (selector) => document.querySelector(selector);
+  const theme = () => window.QQTheme;
 
   function render() {
     const currentState = getState();
@@ -53,17 +54,17 @@
           {
             label: 'До',
             data: INDICATORS.map((code) => district.indicators_before[code]),
-            borderColor: '#89938c',
-            backgroundColor: 'rgba(137,147,140,.10)',
-            pointBackgroundColor: '#89938c',
+            borderColor: theme().colors.before,
+            backgroundColor: theme().alpha(theme().colors.before, .10),
+            pointBackgroundColor: theme().colors.before,
             borderWidth: 2,
           },
           {
             label: 'После',
             data: INDICATORS.map((code) => district.indicators_after[code]),
-            borderColor: '#146b4a',
-            backgroundColor: 'rgba(45,149,108,.20)',
-            pointBackgroundColor: '#146b4a',
+            borderColor: theme().colors.after,
+            backgroundColor: theme().alpha(theme().colors.after, .20),
+            pointBackgroundColor: theme().colors.after,
             borderWidth: 3,
           },
         ],
@@ -88,9 +89,9 @@
             max: 100,
             beginAtZero: true,
             ticks: { stepSize: 20, showLabelBackdrop: false },
-            grid: { color: '#dfe3dc' },
-            angleLines: { color: '#dfe3dc' },
-            pointLabels: { color: '#33433b', font: { size: 12, weight: '700' } },
+            grid: { color: theme().colors.line },
+            angleLines: { color: theme().colors.line },
+            pointLabels: { color: theme().colors.navy, font: { size: 12, weight: '700' } },
           },
         },
       },

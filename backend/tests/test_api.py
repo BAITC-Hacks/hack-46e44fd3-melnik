@@ -11,7 +11,14 @@ def test_health_and_catalog():
     catalog = client.get("/api/catalog")
     assert catalog.status_code == 200
     assert len(catalog.json()["measures"]) == 14
-    assert round(catalog.json()["baseline"]["score"], 2) == 52.56
+    baseline = catalog.json()["baseline"]
+    assert round(baseline["score"], 2) == 52.56
+    assert len(baseline["district_scores"]) == 5
+    assert baseline["min_district"] in baseline["district_scores"]
+    assert baseline["critical_cells"] == [
+        {"district_id": "nura", "indicator": "S1"},
+        {"district_id": "nura", "indicator": "S2"},
+    ]
 
 
 def test_simulate_api_reference_scenario():
@@ -42,7 +49,13 @@ def test_trajectory_api_matches_simulation_at_quarter_eight():
 
 
 def test_indicator_visualization_assets_are_served():
-    for path in ("/matrix.js", "/radar.js", "/insights.css"):
+    for path in (
+        "/matrix.js",
+        "/radar.js",
+        "/insights.css",
+        "/static/theme.js",
+        "/static/vendor/chart.umd.min.js",
+    ):
         response = client.get(path)
         assert response.status_code == 200
         assert response.content
