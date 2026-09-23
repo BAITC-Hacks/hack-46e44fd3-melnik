@@ -2,16 +2,25 @@ import json
 import logging
 import os
 
+from dotenv import load_dotenv
 from openai import OpenAI
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("openai_client")
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client = None
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-placeholder"))
+    return _client
 
 def chat(messages, model="gpt-4o-mini", tools=None, response_format=None, **kwargs):
     logger.info("OpenAI request: model=%s messages=%s tools=%s", model, messages, bool(tools))
-    resp = client.chat.completions.create(
+    resp = get_client().chat.completions.create(
         model=model,
         messages=messages,
         tools=tools,
